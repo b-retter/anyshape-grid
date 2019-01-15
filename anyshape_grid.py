@@ -4,16 +4,6 @@ import numpy as np
 import numpy.random as rnd
 import matplotlib.pyplot as plt
 
-def is_wall(grid,current,step):
-    """checks if grid + step exceeds grid.
-    If so, return True
-    """
-    dim = np.shape(grid)
-    stepped = current+step
-    if np.any(stepped < 0) or stepped[0] > dim[0]-1 or stepped[1] > dim[1]-1:
-        return True
-    else:
-        return False
 
 def num_to_step(num):
     """
@@ -22,13 +12,13 @@ def num_to_step(num):
         1     3
            4
     """
-    if step == 1:
+    if num == 1:
         return np.array([-1,0])
-    elif step == 2:
+    elif num == 2:
         return np.array([0,1])
-    elif step == 3:
+    elif num == 3:
         return np.array([1,0])
-    elif step == 4:
+    elif num == 4:
         return np.array([0,-1])
     
 def make_grid(n_areas,n_length,n_height):
@@ -36,6 +26,24 @@ def make_grid(n_areas,n_length,n_height):
     generates an arbitrary shaped region through random walking starting in the centre
     """
 
+    def is_wall(current,step):
+        """checks if grid + step exceeds grid.
+        If so, return True
+        """
+        dim = np.shape(grid)
+        stepped = current+step
+        if np.any(stepped < 0) or stepped[0] > dim[0]-1 or stepped[1] > dim[1]-1:
+            return True
+        else:
+            return False
+    def b_condition(loc,step):
+        if is_wall(loc,step):
+            # if it is a wall, add the length or height of the grid
+            # making a torus
+            return loc+step-np.array([n_length,n_height])*step
+        else:
+            return loc+step
+        
     def random_walk(loc):
         """
         random walker direction
@@ -44,23 +52,32 @@ def make_grid(n_areas,n_length,n_height):
            4
         """
         step = num_to_step(rnd.randint(1,5))
-        if is_wall(grid,loc,step):
-            step = 
-        
+        return b_condition(loc,step)
 
-    def check_stay(grid,w):
+    def check_stay(w):
         """
         check if walker walks or stays
         walker stays if current square is 0 and one neighbouring square is 1
         otherwise return false. 
         """
-        if np.any([num_to_step(step) for i in range(1,5)
+        if np.sum([grid[b_condition(w,num_to_step(num))[0],b_condition(w,num_to_step(num))[1]] \
+                   for num in range(1,5)]) > 0 and grid[w[0],w[1]] == 0:
+            return True
+        else:
+            return False
+        
     grid = np.zeros((n_length,n_height))
-    mid = np.array([(n_length-)/2, (n_height-1)/2])
+    mid = np.array([(n_length-1)/2, (n_height-1)/2])
     grid[mid[0],mid[1]] = 1
 
-    while np.sum(grid < n_areas):
-        hopper = np.array([mid[0],mid[1]])
-        
-    
-    
+    while np.sum(grid) < n_areas:
+        walker = np.array([mid[0],mid[1]])
+        while check_stay(walker) == False:
+            walker = random_walk(walker)
+        grid[walker[0],walker[1]] = 1
+
+    return grid
+
+grid = make_grid(450,30,30)
+plt.pcolormesh(grid)
+plt.show()
