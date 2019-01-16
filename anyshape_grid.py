@@ -20,24 +20,25 @@ def num_to_step(num):
         return np.array([1,0])
     elif num == 4:
         return np.array([0,-1])
-    
+
+def is_wall(current,step,grid):
+    """checks if grid + step exceeds grid.
+    If so, return True
+    """
+    dim = np.shape(grid)
+    stepped = current+step
+    if np.any(stepped < 0) or stepped[0] > dim[0]-1 or stepped[1] > dim[1]-1:
+        return True
+    else:
+        return False
+        
 def make_grid(n_areas,n_length,n_height):
     """
     generates an arbitrary shaped region through random walking starting in the centre
     """
 
-    def is_wall(current,step):
-        """checks if grid + step exceeds grid.
-        If so, return True
-        """
-        dim = np.shape(grid)
-        stepped = current+step
-        if np.any(stepped < 0) or stepped[0] > dim[0]-1 or stepped[1] > dim[1]-1:
-            return True
-        else:
-            return False
     def b_condition(loc,step):
-        if is_wall(loc,step):
+        if is_wall(loc,step,grid):
             # if it is a wall, add the length or height of the grid
             # making a torus
             return loc+step-np.array([n_length,n_height])*step
@@ -78,6 +79,33 @@ def make_grid(n_areas,n_length,n_height):
 
     return grid
 
-grid = make_grid(450,30,30)
+def circle(x0,y0,R,gx,gy,grid):
+    shape = np.shape(grid)
+    dx = gx[1]-gx[0]
+    dy = gy[1]-gy[0]
+    Rx = np.ceil(R/float(dx))
+    Ry = np.ceil(R/float(dy))
+    x0_i = (x0-gx[0])/dx-0.5
+    y0_i = (y0-gy[0])/dy-0.5
+        
+    for i in range(shape[0]-Rx,shape[0]+R[y]):
+        for j in range(np.shape(grid)[1]):
+            grid[x,y] = np.sqrt((gx[i]-x0)**2 + (gy[j]-y0)**2) <= R
+            
+
+    return None
+
+
+
+x_side = 10
+y_side = 10
+XMIN,XMAX = 0,10
+YMIN,YMAX = 0,10
+
+#central coordinates of the grid squares
+gx = np.linspace(XMIN,XMAX,x_side,endpoint=False) + (XMAX-XMIN)/(2.0*x_side)
+gy = np.linspace(YMIN,YMAX,y_side,endpoint=False) + (YMAX-YMIN)/(2.0*y_side)
+
+grid = make_grid(50,x_side,y_side)
 plt.pcolormesh(grid)
 plt.show()
