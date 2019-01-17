@@ -199,12 +199,42 @@ def yso_to_grid(yso,grid=None):
 
     return yso_map
 
+def random_ysos(val,mode='binomial',grid=None):
+    """
+    Function to populate a grid with random YSOs. YSOs can be placed anywhere
+    with grid == 1.
+    Two modes:
+    If mode is 'binomial' randomly distribute val YSOs around the region.
+    If mode is 'csr', place Poisson((val/study area)*pixel area) ysos in each pixel. 
+    """
 
+    if grid == None:
+        grid = coverage
+
+    shape = np.shape(grid)
+    inside_pixels = np.array(np.where(grid == 1))
+    n_pixels = np.shape(inside_pixels)[1]
+    
+    yso_map = np.zeros(shape)
+    if mode == 'csr':
+        lmda = val/float((XMAX-XMIN)*(YMAX-YMIN))
+        pixel_area = dx*dy
+        for pixel in range(n_pixels):
+            i,j = inside_pixels[0,pixel], inside_pixels[1,pixel]
+            yso_map[i,j] = rnd.poisson(lmda*pixel_area)
+        return yso_map
+    elif mode == 'binomial':
+        while np.sum(yso_map) < val:
+            rand_pixel = rnd.randint(0,n_pixels)
+            i,j = inside_pixels[0,rand_pixel], inside_pixels[1,rand_pixel]
+            yso_map[i,j] += 1
+        return yso_map
     
 x_side = 50
 y_side = 50
 XMIN,XMAX = 0,10
 YMIN,YMAX = 0,10
+AREA = (XMAX-XMIN)*(YMAX-YMIN)
 dx = (XMAX-XMIN)/float(x_side)
 dy = (YMAX-YMIN)/float(y_side)
 
@@ -222,7 +252,8 @@ yso = np.vstack(((rnd.rand(Nyso)*(XMAX-XMIN)+XMIN),(rnd.rand(Nyso)*(YMAX-YMIN)+Y
 coverage = np.ones((x_side,y_side))
 coords = circle(5,5,4)
 
-yso_map = yso_to_grid(yso)
+yso_map = random_ysos(Nyso,'csr')
 
+print(np.sum(yso_map))
 plt.pcolormesh(yso_map)
 plt.show()
