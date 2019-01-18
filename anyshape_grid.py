@@ -3,7 +3,9 @@
 import numpy as np
 import numpy.random as rnd
 import matplotlib.pyplot as plt
-
+import sys
+sys.path.append('/Users/bretter/Documents/StarFormation/RandomDistribution/spatialStats/Functions')
+import allstats as alls
 
 def num_to_step(num):
     """
@@ -179,7 +181,7 @@ def circle(xp,yp,R,grid=None):
                 coords[1].append(j)
             
 
-    return coords
+    return np.array(coords)
 
 def yso_to_grid(yso,grid=None):
     """
@@ -205,7 +207,9 @@ def random_ysos(val,mode='binomial',grid=None):
     with grid == 1.
     Two modes:
     If mode is 'binomial' randomly distribute val YSOs around the region.
-    If mode is 'csr', place Poisson((val/study area)*pixel area) ysos in each pixel. 
+    If mode is 'csr', place Poisson((val/study area)*pixel area) ysos in each pixel.
+
+    Both return the coordinates of the ysos and the completed grid. 
     """
 
     if grid == None:
@@ -216,28 +220,125 @@ def random_ysos(val,mode='binomial',grid=None):
     n_pixels = np.shape(inside_pixels)[1]
     
     yso_map = np.zeros(shape)
+    yso = [[],[]]
     if mode == 'csr':
         lmda = val/float((XMAX-XMIN)*(YMAX-YMIN))
         pixel_area = dx*dy
         for pixel in range(n_pixels):
             i,j = inside_pixels[0,pixel], inside_pixels[1,pixel]
             yso_map[i,j] = rnd.poisson(lmda*pixel_area)
-        return yso_map
+        return yso, yso_map
     elif mode == 'binomial':
         while np.sum(yso_map) < val:
             rand_pixel = rnd.randint(0,n_pixels)
             i,j = inside_pixels[0,rand_pixel], inside_pixels[1,rand_pixel]
             yso_map[i,j] += 1
-        return yso_map
+        return yso, yso_map
+
+def kfunc(x,y,t,yso_map=None,grid=None):
+    """
+    Calculates K function for points with coords x,y.
+    Most likely x and y are the positions of yso.
+    """
+
+    if yso_map == None:
+        yso_map = yso_to_grid(np.array([x,y]),grid)
+        
+    if grid == None:
+        grid = coverage
+
+    #yso will each count themselves once over the course of the 
+    #algorithm. This accounts for the self-counting.
+    yso_sum = -np.sum(yso_map)
+    area_sum = 0
+    for i in range(len(x)):
+        coords = circle(x[i],y[i],t,grid)
+        n_coords = np.shape(coords)[1]
+        area_sum += n_coords
+        
+        for j in range(n_coords):
+            yso_sum+=yso_map[coords[0,j],coords[1,j]]
     
-x_side = 50
-y_side = 50
-XMIN,XMAX = 0,10
-YMIN,YMAX = 0,10
+    area = dx*dy*area_sum
+    lmda = np.sum(yso_map)/float(np.sum(grid)*dx*dy)
+    K = np.pi*t**2/lmda*yso_sum/float(area)
+    L = np.sqrt(K/np.pi) - t
+    return K, L
+
+def Oring(x,y,t,w,yso_map=None,grid=None):
+    """
+    Calculates Oring function for points with coords x,y.
+    Most likely x and y are the positions of yso.
+    """
+
+    if yso_map == None:
+        yso_map = yso_to_grid(np.array([x,y]),grid)
+        
+    if grid == None:
+        grid = coverage
+        
+    yso_sum = 0
+    area_sum = 0
+    for i in range(len(x)):
+        coords = ring(x[i],y[i],t,w,grid)
+        n_coords = np.shape(coords)[1]
+        area_sum += n_coords
+
+        xg,yg = xy2grid(x[i],y[i])
+        for j in range(n_coords):
+            if coords[0,j]==xg and coords[1,j]==yg:
+                continue
+            yso_sum+=yso_map[coords[0,j],coords[1,j]]
+    
+    area = dx*dy*area_sum
+    lmda = np.sum(yso_map)/float(np.sum(grid)*dx*dy)
+    O = yso_sum/float(area)
+    return O, O/lmda
+
+def ring(xp,yp,R,w,grid=None):
+    """
+    Finds all the grid squares that are in an annulus around
+    xp,yp with radius R and width w. 
+    """
+    #allow a default value of grid to be the coverage map
+    if grid == None:
+        grid = coverage
+
+    Rout = R+w/2.0
+    Rin = R-w/2.0
+    if xp < x[0] or xp > max(x):
+        print('xp outside of range')
+    elif yp < y[0] or yp > max(y):
+        print('yp outside of range')
+        
+    Rx = delDist2Grid(Rout,axis='x')
+    Ry = delDist2Grid(Rout,axis='y')
+    xg,yg = xy2grid(xp,yp)
+
+    shape = np.shape(grid)
+    
+    x_min,x_max = max(xg-Rx,0), min(xg+Rx+1,shape[0])
+    y_min,y_max = max(yg-Ry,0), min(yg+Ry+1,shape[1])
+
+    coords = [[],[]]
+    for i in range(x_min,x_max):
+        for j in range(y_min,y_max):
+            d = np.sqrt((gx[i]-xp)**2 + (gy[j]-yp)**2)
+            if grid[i,j] == 1 and d <= Rout and d >= Rin:
+                coords[0].append(i)
+                coords[1].append(j)            
+
+    return np.array(coords)
+
+x_side = 100
+y_side = 100
+XMIN,XMAX = 0,30
+YMIN,YMAX = 0,30
 AREA = (XMAX-XMIN)*(YMAX-YMIN)
 dx = (XMAX-XMIN)/float(x_side)
 dy = (YMAX-YMIN)/float(y_side)
 
+bounds = np.array([[XMIN,XMAX],[YMIN,YMAX]])
 
 #central coordinates of the grid squares
 x = np.arange(XMIN,XMAX+dx,dx)
@@ -245,15 +346,70 @@ y = np.arange(YMIN,YMAX+dy,dy)
 gx = np.linspace(XMIN,XMAX,x_side,endpoint=False) + (XMAX-XMIN)/(2.0*x_side)
 gy = np.linspace(YMIN,YMAX,y_side,endpoint=False) + (YMAX-YMIN)/(2.0*y_side)
 
-Nyso = 500
-yso = np.vstack(((rnd.rand(Nyso)*(XMAX-XMIN)+XMIN),(rnd.rand(Nyso)*(YMAX-YMIN)+YMIN)))
-
-#grid = make_grid(50,x_side,y_side)
+Nyso = 200
 coverage = np.ones((x_side,y_side))
-coords = circle(5,5,4)
 
-yso_map = random_ysos(Nyso,'csr')
+x0,y0 = 15,15
+R = 10
+circ = circle(x0,y0,R)
+coverage = np.zeros((x_side,y_side))
+for i in range(np.shape(circ)[1]):
+    coverage[circ[0,i],circ[1,i]] = 1
 
-print(np.sum(yso_map))
-plt.pcolormesh(yso_map)
+N = 0
+yso = [[],[]]
+while N < Nyso:
+    xx = (rnd.rand(Nyso-N)-0.5)*2*R
+    yy = (rnd.rand(Nyso-N)-0.5)*2*R
+    for i in range(Nyso-N):
+        d = np.sqrt(xx[i]**2 + yy[i]**2)
+        if d <= R:
+            yso[0].append(xx[i]+x0)
+            yso[1].append(yy[i]+y0)
+            N+=1
+
+yso = np.array(yso)
+yso_map = yso_to_grid(yso)
+
+step = 20
+r = np.linspace(1,15,step)
+h = 0.5
+
+O1,L1 = [], []
+O2,L2 = [], []
+for i,t in enumerate(r):
+    w = h
+    o,oo = Oring(yso[0,:],yso[1,:],t,w,yso_map=None,grid=None)
+    O1.append(oo)
+    k,kk = kfunc(yso[0,:],yso[1,:],t,yso_map=None,grid=None)
+    L1.append(kk)
+
+    o,oo = alls.Oring(yso[0,:],yso[1,:],t,w,AREA,bounds)
+    O2.append(oo)
+    k,kk = alls.kfunc(yso[0,:],yso[1,:],t,AREA,bounds)
+    L2.append(kk)
+
+
+plt.figure()
+plt.plot(r,O1,'r')
+plt.plot(r,O2,'b')
+
+plt.figure()
+plt.plot(r,L1,'r')
+plt.plot(r,L2,'b')
+
 plt.show()
+## yso_map = random_ysos(Nyso,mode='binomial'):
+
+## yso = np.vstack(((rnd.rand(Nyso)*(XMAX-XMIN)+XMIN),(rnd.rand(Nyso)*(YMAX-YMIN)+YMIN)))
+## #grid = make_grid(50,x_side,y_side)
+## coverage = np.ones((x_side,y_side))
+
+
+## t = 5
+## w = 1
+## K1,L1 = Oring(yso[0,:],yso[1,:],t,w,yso_map=None,grid=None)
+## K2,L2 = alls.Oring(yso[0,:],yso[1,:],t,w,AREA,bounds)
+
+## print('O1 = {:.4f}, O/lambda = {:.4f}'.format(K1,L1))
+## print('O1 = {:.4f}, O/lambda = {:.4f}'.format(K2,L2))
