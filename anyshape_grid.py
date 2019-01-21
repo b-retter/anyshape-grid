@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import sys
 sys.path.append('/Users/bretter/Documents/StarFormation/RandomDistribution/spatialStats/Functions')
 import allstats as alls
+from timeit import default_timer as timer
 
 def num_to_step(num):
     """
@@ -50,9 +51,9 @@ def box_check(xg,yg,Lx,Ly=None,grid=None):
     #Check if bounds nearby
     steps = map(num_to_step,range(1,5))
     xy = np.array([xg,yg])
-    if is_wall(xy,steps[0]*Lx/2,grid) or is_wall(xy,steps[2]*Lx/2,grid):
+    if is_wall(xy,steps[0]*(Lx/2),grid) or is_wall(xy,steps[2]*(Lx/2),grid):
         return False
-    if is_wall(xy,steps[1]*Ly/2,grid) or is_wall(xy,steps[3]*Ly/2,grid):
+    if is_wall(xy,steps[1]*(Ly/2),grid) or is_wall(xy,steps[3]*(Ly/2),grid):
         return False
 
     #Check if any cells not in coverage map
@@ -217,7 +218,7 @@ def circle(xp,yp,R,grid=None,relative=False):
     if relative == False:
         return np.array(coords)
     elif relative == True:
-        return np.array(coords)-np.array([xp,yp]).reshape(2,1)
+        return np.array(coords)-np.array([xg,yg]).reshape(2,1)
 
 def yso_to_grid(yso,grid=None):
     """
@@ -271,7 +272,7 @@ def random_ysos(val,mode='binomial',grid=None):
             yso_map[i,j] += 1
         return yso, yso_map
 
-def kfunc(x,y,t,yso_map=None,grid=None):
+def kfunc(x,y,t,yso_map=None,grid=None,opti=False):
     """
     Calculates K function for points with coords x,y.
     Most likely x and y are the positions of yso.
@@ -291,11 +292,16 @@ def kfunc(x,y,t,yso_map=None,grid=None):
     #Generate relative circle coords for approx centre of map
     shape = np.shape(yso_map)
     x_mid,y_mid = ij2xy(shape[0]/2,shape[1]/2)
-    mid_coords = circle(x_mid,y_mid,t,grid)
-    
+    mid_coords = circle(x_mid,y_mid,t,np.ones(shape),relative=True)
         
     for i in range(len(x)):
-        coords = circle(x[i],y[i],t,grid)
+        xg,yg = xy2grid(x[i],y[i])
+        Lx = 2*delDist2Grid(t,axis='x')
+        Ly = 2*delDist2Grid(t,axis='y')
+        if opti == True and box_check(xg,yg,Lx,Ly,grid=grid):
+            coords = np.copy(mid_coords)+np.array([xg,yg]).reshape(2,1)
+        else:
+            coords = circle(x[i],y[i],t,grid)
         n_coords = np.shape(coords)[1]
         area_sum += n_coords
         
@@ -308,7 +314,7 @@ def kfunc(x,y,t,yso_map=None,grid=None):
     L = np.sqrt(K/np.pi) - t
     return K, L
 
-def Oring(x,y,t,w,yso_map=None,grid=None):
+def Oring(x,y,t,w,yso_map=None,grid=None,opti=False):
     """
     Calculates Oring function for points with coords x,y.
     Most likely x and y are the positions of yso.
@@ -319,11 +325,22 @@ def Oring(x,y,t,w,yso_map=None,grid=None):
         
     if grid == None:
         grid = coverage
-        
+
+    #Generate relative circle coords for approx centre of map
+    shape = np.shape(yso_map)
+    x_mid,y_mid = ij2xy(shape[0]/2,shape[1]/2)
+    mid_coords = ring(x_mid,y_mid,t,w,np.ones(shape),relative=True)
+    
     yso_sum = 0
     area_sum = 0
     for i in range(len(x)):
-        coords = ring(x[i],y[i],t,w,grid)
+        xg,yg = xy2grid(x[i],y[i])
+        Lx = 2*delDist2Grid(t+w,axis='x')
+        Ly = 2*delDist2Grid(t+w,axis='y')
+        if opti == True and box_check(xg,yg,Lx,Ly,grid=grid):
+            coords = np.copy(mid_coords)+np.array([xg,yg]).reshape(2,1)
+        else:
+            coords = ring(x[i],y[i],t,w,grid)
         n_coords = np.shape(coords)[1]
         area_sum += n_coords
 
@@ -377,7 +394,7 @@ def ring(xp,yp,R,w,grid=None,relative=False):
     if relative == False:
         return np.array(coords)
     elif relative == True:
-        return np.array(coords) - np.array([xp,yp]).reshape(2,1)
+        return np.array(coords) - np.array([xg,yg]).reshape(2,1)
 
 x_side = 100
 y_side = 100
@@ -395,15 +412,15 @@ y = np.arange(YMIN,YMAX+dy,dy)
 gx = np.linspace(XMIN,XMAX,x_side,endpoint=False) + (XMAX-XMIN)/(2.0*x_side)
 gy = np.linspace(YMIN,YMAX,y_side,endpoint=False) + (YMAX-YMIN)/(2.0*y_side)
 
-Nyso = 200
-## coverage = np.ones((x_side,y_side))
+Nyso = 50
+coverage = np.ones((x_side,y_side))
 
-## x0,y0 = 15,15
-## R = 10
-## circ = circle(x0,y0,R)
-## coverage = np.zeros((x_side,y_side))
-## for i in range(np.shape(circ)[1]):
-##     coverage[circ[0,i],circ[1,i]] = 1
+x0,y0 = 15,15
+R = 10
+circ = circle(x0,y0,R)
+coverage = np.ones((x_side,y_side))
+#for i in range(np.shape(circ)[1]):
+#    coverage[circ[0,i],circ[1,i]] = 1
 
 ## N = 0
 ## yso = [[],[]]
@@ -417,38 +434,58 @@ Nyso = 200
 ##             yso[1].append(yy[i]+y0)
 ##             N+=1
 
-## yso = np.array(yso)
-## yso_map = yso_to_grid(yso)
 
-## step = 20
-## r = np.linspace(1,15,step)
-## h = 0.5
+##yso = np.array(yso)
 
-## O1,L1 = [], []
-## O2,L2 = [], []
-## for i,t in enumerate(r):
-##     w = h
-##     o,oo = Oring(yso[0,:],yso[1,:],t,w,yso_map=None,grid=None)
-##     O1.append(oo)
-##     k,kk = kfunc(yso[0,:],yso[1,:],t,yso_map=None,grid=None)
-##     L1.append(kk)
+yso = np.array([rnd.rand(Nyso)*XMAX,rnd.rand(Nyso)*YMAX])
+yso_map = yso_to_grid(yso)
 
-##     o,oo = alls.Oring(yso[0,:],yso[1,:],t,w,AREA,bounds)
-##     O2.append(oo)
-##     k,kk = alls.kfunc(yso[0,:],yso[1,:],t,AREA,bounds)
-##     L2.append(kk)
+step = 10
+r = np.linspace(1.5,15,step)
+h = 1
 
+O1,L1 = [], []
+O2,L2 = [], []
+O3,L3 = [], []
+start = timer()
+for i,t in enumerate(r):
+    w = h
+    o,oo = Oring(yso[0,:],yso[1,:],t,w,yso_map=None,grid=None)
+    O1.append(oo)
+#    k,kk = kfunc(yso[0,:],yso[1,:],t,opti=False,yso_map=None,grid=None)
+#    L1.append(kk)
+end = timer()
+print(end-start)
 
-## plt.figure()
-## plt.plot(r,O1,'r')
-## plt.plot(r,O2,'b')
-## plt.title('Comparison of new (red) vs old (blue) Oring')
-## plt.xlabel('r')
-## plt.ylabel('O/lambda')
+start=timer()
+for i,t in enumerate(r):
+    o,oo = alls.Oring(yso[0,:],yso[1,:],t,w,AREA,bounds)
+    O2.append(oo)
+#    k,kk = alls.kfunc(yso[0,:],yso[1,:],t,AREA,bounds)
+#    L2.append(kk)
+end=timer()
+print(end-start)
+
+start=timer()
+for i,t in enumerate(r):
+    o,oo = Oring(yso[0,:],yso[1,:],t,w,opti=True,yso_map=None,grid=None)
+    O3.append(oo)
+#    k,kk = kfunc(yso[0,:],yso[1,:],t,opti=True,yso_map=None,grid=None)
+#    L3.append(kk)
+end=timer()
+print(end-start)
+plt.figure()
+plt.plot(r,O1,'r')
+plt.plot(r,O2,'b')
+plt.plot(r,O3,'g')
+plt.title('Comparison of new (red), "optimised" (green) vs old (blue) Oring')
+plt.xlabel('r')
+plt.ylabel('O/lambda')
 ## plt.figure()
 ## plt.plot(r,L1,'r')
 ## plt.plot(r,L2,'b')
-## plt.title('Comparison of new (red) vs old (blue) kfunc')
+## plt.plot(r,L3,'g')
+## plt.title('Comparison of new (red), "optimised" (green) vs old (blue) kfunc')
 ## plt.xlabel('r')
 ## plt.ylabel('L')
 ## plt.figure()
@@ -457,4 +494,4 @@ Nyso = 200
 ## plt.xlabel('x')
 ## plt.ylabel('y')
 ## plt.axis([0,30,0,30])
-## plt.show()
+plt.show()
