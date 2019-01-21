@@ -199,26 +199,15 @@ def circle(xp,yp,R,grid=None,relative=False):
     elif yp < y[0] or yp > y[-1]:
         print('yp outside of range')
         
-    Rx = delDist2Grid(R,axis='x')
-    Ry = delDist2Grid(R,axis='y')
     xg,yg = xy2grid(xp,yp)
 
-    shape = np.shape(grid)
-    
-    x_min,x_max = max(xg-Rx,0), min(xg+Rx+1,shape[0])
-    y_min,y_max = max(yg-Ry,0), min(yg+Ry+1,shape[1])
-
-    coords = [[],[]]
-    for i in range(x_min,x_max):
-        for j in range(y_min,y_max):
-            if grid[i,j] == 1 and np.sqrt((gx[i]-xp)**2 + (gy[j]-yp)**2) <= R:
-                coords[0].append(i)
-                coords[1].append(j)
-            
+    GX, GY = np.meshgrid(gx,gy)
+    dists = np.sqrt((GX-xp)**2 + (GY-yp)**2)
+    co_1,co_2 = np.where((grid*dists <= R) & (grid*dists > 0))
     if relative == False:
-        return np.array(coords)
+        return np.array([co_1,co_2])
     elif relative == True:
-        return np.array(coords)-np.array([xg,yg]).reshape(2,1)
+        return np.array([co_1,co_2])-np.array([xg,yg]).reshape(2,1)
 
 def yso_to_grid(yso,grid=None):
     """
@@ -397,7 +386,7 @@ def ring(xp,yp,R,w,grid=None,relative=False):
         return np.array(coords) - np.array([xg,yg]).reshape(2,1)
 
 x_side = 100
-y_side = 100
+y_side = 200
 XMIN,XMAX = 0,30
 YMIN,YMAX = 0,30
 AREA = (XMAX-XMIN)*(YMAX-YMIN)
@@ -415,10 +404,15 @@ gy = np.linspace(YMIN,YMAX,y_side,endpoint=False) + (YMAX-YMIN)/(2.0*y_side)
 Nyso = 50
 coverage = np.ones((x_side,y_side))
 
-x0,y0 = 15,15
-R = 10
-circ = circle(x0,y0,R)
-coverage = np.ones((x_side,y_side))
+x0,y0 = 26,26
+R = 5
+w = 1
+c = circle(x0,y0,R)
+for i in range(np.shape(c)[1]):
+    coverage[c[0,i],c[1,i]] = 2
+
+plt.pcolormesh(coverage)
+plt.show()
 #for i in range(np.shape(circ)[1]):
 #    coverage[circ[0,i],circ[1,i]] = 1
 
@@ -444,54 +438,41 @@ step = 10
 r = np.linspace(1.5,15,step)
 h = 1
 
-O1,L1 = [], []
-O2,L2 = [], []
-O3,L3 = [], []
-start = timer()
-for i,t in enumerate(r):
-    w = h
-    o,oo = Oring(yso[0,:],yso[1,:],t,w,yso_map=None,grid=None)
-    O1.append(oo)
-#    k,kk = kfunc(yso[0,:],yso[1,:],t,opti=False,yso_map=None,grid=None)
-#    L1.append(kk)
-end = timer()
-print(end-start)
+## O1,L1 = [], []
+## O2,L2 = [], []
+## O3,L3 = [], []
+## start = timer()
+## for i,t in enumerate(r):
+##    w = h
+##    #o,oo = Oring(yso[0,:],yso[1,:],t,w,yso_map=None,grid=None)
+##    #O1.append(oo)
+##    k,kk = kfunc(yso[0,:],yso[1,:],t,opti=False,yso_map=None,grid=None)
+##    L1.append(kk)
+##    #o,oo = alls.Oring(yso[0,:],yso[1,:],t,w,AREA,bounds)
+##    #O2.append(oo)
+##    k,kk = alls.kfunc(yso[0,:],yso[1,:],t,AREA,bounds)
+##    L2.append(kk)
+## end = timer()
+## print(end-start)
 
-start=timer()
-for i,t in enumerate(r):
-    o,oo = alls.Oring(yso[0,:],yso[1,:],t,w,AREA,bounds)
-    O2.append(oo)
-#    k,kk = alls.kfunc(yso[0,:],yso[1,:],t,AREA,bounds)
-#    L2.append(kk)
-end=timer()
-print(end-start)
-
-start=timer()
-for i,t in enumerate(r):
-    o,oo = Oring(yso[0,:],yso[1,:],t,w,opti=True,yso_map=None,grid=None)
-    O3.append(oo)
-#    k,kk = kfunc(yso[0,:],yso[1,:],t,opti=True,yso_map=None,grid=None)
-#    L3.append(kk)
-end=timer()
-print(end-start)
-plt.figure()
-plt.plot(r,O1,'r')
-plt.plot(r,O2,'b')
-plt.plot(r,O3,'g')
-plt.title('Comparison of new (red), "optimised" (green) vs old (blue) Oring')
-plt.xlabel('r')
-plt.ylabel('O/lambda')
+## ## plt.figure()
+## ## plt.plot(r,O1,'r')
+## ## plt.plot(r,O2,'b')
+## ## plt.plot(r,O3,'g')
+## ## plt.title('Comparison of new (red), "optimised" (green) vs old (blue) Oring')
+## ## plt.xlabel('r')
+## ## plt.ylabel('O/lambda')
 ## plt.figure()
 ## plt.plot(r,L1,'r')
 ## plt.plot(r,L2,'b')
-## plt.plot(r,L3,'g')
+## #plt.plot(r,L3,'g')
 ## plt.title('Comparison of new (red), "optimised" (green) vs old (blue) kfunc')
 ## plt.xlabel('r')
 ## plt.ylabel('L')
-## plt.figure()
-## plt.plot(yso[0,:],yso[1,:],'*')
-## plt.title('YSO positions')
-## plt.xlabel('x')
-## plt.ylabel('y')
-## plt.axis([0,30,0,30])
-plt.show()
+## ## plt.figure()
+## ## plt.plot(yso[0,:],yso[1,:],'*')
+## ## plt.title('YSO positions')
+## ## plt.xlabel('x')
+## ## plt.ylabel('y')
+## ## plt.axis([0,30,0,30])
+## plt.show()
