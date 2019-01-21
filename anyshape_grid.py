@@ -26,6 +26,8 @@ def num_to_step(num):
 def is_wall(current,step,grid):
     """checks if grid + step exceeds grid.
     If so, return True
+    current = array([x,y])
+    step = array([x,y])
     """
     dim = np.shape(grid)
     stepped = current+step
@@ -33,7 +35,34 @@ def is_wall(current,step,grid):
         return True
     else:
         return False
+def box_check(xg,yg,Lx,Ly=None,grid=None):
+    """
+    Checks if there are any cells not covered by coverage map, or
+    exceed the bounds of the coverage map within box of side L,
+    centered on xp,yp.
+    Returns False if not entirely within map.
+    """
+    if grid == None:
+        grid = coverage
+    if Ly == None:
+        Ly = Lx
         
+    #Check if bounds nearby
+    steps = map(num_to_step,range(1,5))
+    xy = np.array([xg,yg])
+    if is_wall(xy,steps[0]*Lx/2,grid) or is_wall(xy,steps[2]*Lx/2,grid):
+        return False
+    if is_wall(xy,steps[1]*Ly/2,grid) or is_wall(xy,steps[3]*Ly/2,grid):
+        return False
+
+    #Check if any cells not in coverage map
+    x_min,x_max = xg-Lx/2, xg+Lx/2+1
+    y_min,y_max = yg-Ly/2, yg+Ly/2+1
+    if np.any(grid[x_min:x_max,y_min:y_max] == 0):
+        return False
+    else:
+        return True
+
 def make_grid(n_areas,n_length,n_height):
     """
     generates an arbitrary shaped region through random walking starting in the centre
@@ -137,6 +166,8 @@ def x2index(v,axis):
 
 def xy2grid(v1,v2):
     return x2index(v1,'x'),x2index(v2,'y')
+def ij2xy(i,j):
+    return index2x(i,'x'),index2x(j,'y')
 
 def delDist2Grid(v2,v1=0,axis=None):
     if axis == 'x':
@@ -150,18 +181,21 @@ def delGrid2Dist(i2,i1=0,axis=None):
     if axis == 'y':
         return (i2-i1)*dy
     
-def circle(xp,yp,R,grid=None):
+def circle(xp,yp,R,grid=None,relative=False):
     """
     Finds all the grid squares that are in a circle around
-    xp,yp with radius R. 
+    xp,yp with radius R.
+    If relative is true, provide relative differences in
+    grid coords between xp,yp and circle cells.
+    Otherwise provide the absolute references.
     """
     #allow a default value of grid to be the coverage map
     if grid == None:
         grid = coverage
 
-    if xp < x[0] or xp > max(x):
+    if xp < x[0] or xp > x[-1]:
         print('xp outside of range')
-    elif yp < y[0] or yp > max(y):
+    elif yp < y[0] or yp > y[-1]:
         print('yp outside of range')
         
     Rx = delDist2Grid(R,axis='x')
@@ -180,8 +214,10 @@ def circle(xp,yp,R,grid=None):
                 coords[0].append(i)
                 coords[1].append(j)
             
-
-    return np.array(coords)
+    if relative == False:
+        return np.array(coords)
+    elif relative == True:
+        return np.array(coords)-np.array([xp,yp]).reshape(2,1)
 
 def yso_to_grid(yso,grid=None):
     """
@@ -251,6 +287,13 @@ def kfunc(x,y,t,yso_map=None,grid=None):
     #algorithm. This accounts for the self-counting.
     yso_sum = -np.sum(yso_map)
     area_sum = 0
+
+    #Generate relative circle coords for approx centre of map
+    shape = np.shape(yso_map)
+    x_mid,y_mid = ij2xy(shape[0]/2,shape[1]/2)
+    mid_coords = circle(x_mid,y_mid,t,grid)
+    
+        
     for i in range(len(x)):
         coords = circle(x[i],y[i],t,grid)
         n_coords = np.shape(coords)[1]
@@ -295,10 +338,13 @@ def Oring(x,y,t,w,yso_map=None,grid=None):
     O = yso_sum/float(area)
     return O, O/lmda
 
-def ring(xp,yp,R,w,grid=None):
+def ring(xp,yp,R,w,grid=None,relative=False):
     """
     Finds all the grid squares that are in an annulus around
-    xp,yp with radius R and width w. 
+    xp,yp with radius R and width w.
+    If relative is True, provide relative differences in
+    grid coords between xp,yp and circle cells.
+    Otherwise provide the absolute references.
     """
     #allow a default value of grid to be the coverage map
     if grid == None:
@@ -326,9 +372,12 @@ def ring(xp,yp,R,w,grid=None):
             d = np.sqrt((gx[i]-xp)**2 + (gy[j]-yp)**2)
             if grid[i,j] == 1 and d <= Rout and d >= Rin:
                 coords[0].append(i)
-                coords[1].append(j)            
-
-    return np.array(coords)
+                coords[1].append(j)
+                
+    if relative == False:
+        return np.array(coords)
+    elif relative == True:
+        return np.array(coords) - np.array([xp,yp]).reshape(2,1)
 
 x_side = 100
 y_side = 100
@@ -347,69 +396,65 @@ gx = np.linspace(XMIN,XMAX,x_side,endpoint=False) + (XMAX-XMIN)/(2.0*x_side)
 gy = np.linspace(YMIN,YMAX,y_side,endpoint=False) + (YMAX-YMIN)/(2.0*y_side)
 
 Nyso = 200
-coverage = np.ones((x_side,y_side))
-
-x0,y0 = 15,15
-R = 10
-circ = circle(x0,y0,R)
-coverage = np.zeros((x_side,y_side))
-for i in range(np.shape(circ)[1]):
-    coverage[circ[0,i],circ[1,i]] = 1
-
-N = 0
-yso = [[],[]]
-while N < Nyso:
-    xx = (rnd.rand(Nyso-N)-0.5)*2*R
-    yy = (rnd.rand(Nyso-N)-0.5)*2*R
-    for i in range(Nyso-N):
-        d = np.sqrt(xx[i]**2 + yy[i]**2)
-        if d <= R:
-            yso[0].append(xx[i]+x0)
-            yso[1].append(yy[i]+y0)
-            N+=1
-
-yso = np.array(yso)
-yso_map = yso_to_grid(yso)
-
-step = 20
-r = np.linspace(1,15,step)
-h = 0.5
-
-O1,L1 = [], []
-O2,L2 = [], []
-for i,t in enumerate(r):
-    w = h
-    o,oo = Oring(yso[0,:],yso[1,:],t,w,yso_map=None,grid=None)
-    O1.append(oo)
-    k,kk = kfunc(yso[0,:],yso[1,:],t,yso_map=None,grid=None)
-    L1.append(kk)
-
-    o,oo = alls.Oring(yso[0,:],yso[1,:],t,w,AREA,bounds)
-    O2.append(oo)
-    k,kk = alls.kfunc(yso[0,:],yso[1,:],t,AREA,bounds)
-    L2.append(kk)
-
-
-plt.figure()
-plt.plot(r,O1,'r')
-plt.plot(r,O2,'b')
-
-plt.figure()
-plt.plot(r,L1,'r')
-plt.plot(r,L2,'b')
-
-plt.show()
-## yso_map = random_ysos(Nyso,mode='binomial'):
-
-## yso = np.vstack(((rnd.rand(Nyso)*(XMAX-XMIN)+XMIN),(rnd.rand(Nyso)*(YMAX-YMIN)+YMIN)))
-## #grid = make_grid(50,x_side,y_side)
 ## coverage = np.ones((x_side,y_side))
 
+## x0,y0 = 15,15
+## R = 10
+## circ = circle(x0,y0,R)
+## coverage = np.zeros((x_side,y_side))
+## for i in range(np.shape(circ)[1]):
+##     coverage[circ[0,i],circ[1,i]] = 1
 
-## t = 5
-## w = 1
-## K1,L1 = Oring(yso[0,:],yso[1,:],t,w,yso_map=None,grid=None)
-## K2,L2 = alls.Oring(yso[0,:],yso[1,:],t,w,AREA,bounds)
+## N = 0
+## yso = [[],[]]
+## while N < Nyso:
+##     xx = (rnd.rand(Nyso-N)-0.5)*2*R
+##     yy = (rnd.rand(Nyso-N)-0.5)*2*R
+##     for i in range(Nyso-N):
+##         d = np.sqrt(xx[i]**2 + yy[i]**2)
+##         if d <= R:
+##             yso[0].append(xx[i]+x0)
+##             yso[1].append(yy[i]+y0)
+##             N+=1
 
-## print('O1 = {:.4f}, O/lambda = {:.4f}'.format(K1,L1))
-## print('O1 = {:.4f}, O/lambda = {:.4f}'.format(K2,L2))
+## yso = np.array(yso)
+## yso_map = yso_to_grid(yso)
+
+## step = 20
+## r = np.linspace(1,15,step)
+## h = 0.5
+
+## O1,L1 = [], []
+## O2,L2 = [], []
+## for i,t in enumerate(r):
+##     w = h
+##     o,oo = Oring(yso[0,:],yso[1,:],t,w,yso_map=None,grid=None)
+##     O1.append(oo)
+##     k,kk = kfunc(yso[0,:],yso[1,:],t,yso_map=None,grid=None)
+##     L1.append(kk)
+
+##     o,oo = alls.Oring(yso[0,:],yso[1,:],t,w,AREA,bounds)
+##     O2.append(oo)
+##     k,kk = alls.kfunc(yso[0,:],yso[1,:],t,AREA,bounds)
+##     L2.append(kk)
+
+
+## plt.figure()
+## plt.plot(r,O1,'r')
+## plt.plot(r,O2,'b')
+## plt.title('Comparison of new (red) vs old (blue) Oring')
+## plt.xlabel('r')
+## plt.ylabel('O/lambda')
+## plt.figure()
+## plt.plot(r,L1,'r')
+## plt.plot(r,L2,'b')
+## plt.title('Comparison of new (red) vs old (blue) kfunc')
+## plt.xlabel('r')
+## plt.ylabel('L')
+## plt.figure()
+## plt.plot(yso[0,:],yso[1,:],'*')
+## plt.title('YSO positions')
+## plt.xlabel('x')
+## plt.ylabel('y')
+## plt.axis([0,30,0,30])
+## plt.show()
