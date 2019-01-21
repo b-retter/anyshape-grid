@@ -203,12 +203,12 @@ def circle(xp,yp,R,grid=None,relative=False):
 
     GX, GY = np.meshgrid(gx,gy)
     dists = np.sqrt((GX-xp)**2 + (GY-yp)**2)
-    co_1,co_2 = np.where((grid*dists <= R) & (grid*dists > 0))
+    co_y,co_x = np.where((dists <= R) & (grid == 1))
     if relative == False:
-        return np.array([co_1,co_2])
+        return np.array([co_x,co_y])
     elif relative == True:
-        return np.array([co_1,co_2])-np.array([xg,yg]).reshape(2,1)
-
+        return np.array([co_x,co_y])-np.array([xg,yg]).reshape(2,1)
+    
 def yso_to_grid(yso,grid=None):
     """
     Make a new grid to place YSOs into using grid as a mask
@@ -282,7 +282,7 @@ def kfunc(x,y,t,yso_map=None,grid=None,opti=False):
     shape = np.shape(yso_map)
     x_mid,y_mid = ij2xy(shape[0]/2,shape[1]/2)
     mid_coords = circle(x_mid,y_mid,t,np.ones(shape),relative=True)
-        
+    
     for i in range(len(x)):
         xg,yg = xy2grid(x[i],y[i])
         Lx = 2*delDist2Grid(t,axis='x')
@@ -291,6 +291,7 @@ def kfunc(x,y,t,yso_map=None,grid=None,opti=False):
             coords = np.copy(mid_coords)+np.array([xg,yg]).reshape(2,1)
         else:
             coords = circle(x[i],y[i],t,grid)
+                
         n_coords = np.shape(coords)[1]
         area_sum += n_coords
         
@@ -369,8 +370,8 @@ def ring(xp,yp,R,w,grid=None,relative=False):
 
     shape = np.shape(grid)
     
-    x_min,x_max = max(xg-Rx,0), min(xg+Rx+1,shape[0])
-    y_min,y_max = max(yg-Ry,0), min(yg+Ry+1,shape[1])
+    x_min,x_max = max(xg-Rx-1,0), min(xg+Rx+1,shape[0])
+    y_min,y_max = max(yg-Ry-1,0), min(yg+Ry+1,shape[1])
 
     coords = [[],[]]
     for i in range(x_min,x_max):
@@ -386,7 +387,7 @@ def ring(xp,yp,R,w,grid=None,relative=False):
         return np.array(coords) - np.array([xg,yg]).reshape(2,1)
 
 x_side = 100
-y_side = 200
+y_side = 100
 XMIN,XMAX = 0,30
 YMIN,YMAX = 0,30
 AREA = (XMAX-XMIN)*(YMAX-YMIN)
@@ -404,18 +405,6 @@ gy = np.linspace(YMIN,YMAX,y_side,endpoint=False) + (YMAX-YMIN)/(2.0*y_side)
 Nyso = 50
 coverage = np.ones((x_side,y_side))
 
-x0,y0 = 26,26
-R = 5
-w = 1
-c = circle(x0,y0,R)
-for i in range(np.shape(c)[1]):
-    coverage[c[0,i],c[1,i]] = 2
-
-plt.pcolormesh(coverage)
-plt.show()
-#for i in range(np.shape(circ)[1]):
-#    coverage[circ[0,i],circ[1,i]] = 1
-
 ## N = 0
 ## yso = [[],[]]
 ## while N < Nyso:
@@ -431,29 +420,29 @@ plt.show()
 
 ##yso = np.array(yso)
 
-yso = np.array([rnd.rand(Nyso)*XMAX,rnd.rand(Nyso)*YMAX])
-yso_map = yso_to_grid(yso)
+#yso = np.array([rnd.rand(Nyso)*XMAX,rnd.rand(Nyso)*YMAX])
+#yso_map = yso_to_grid(yso)
 
-step = 10
+step = 5
 r = np.linspace(1.5,15,step)
 h = 1
 
-## O1,L1 = [], []
-## O2,L2 = [], []
-## O3,L3 = [], []
-## start = timer()
-## for i,t in enumerate(r):
-##    w = h
-##    #o,oo = Oring(yso[0,:],yso[1,:],t,w,yso_map=None,grid=None)
-##    #O1.append(oo)
-##    k,kk = kfunc(yso[0,:],yso[1,:],t,opti=False,yso_map=None,grid=None)
-##    L1.append(kk)
-##    #o,oo = alls.Oring(yso[0,:],yso[1,:],t,w,AREA,bounds)
-##    #O2.append(oo)
-##    k,kk = alls.kfunc(yso[0,:],yso[1,:],t,AREA,bounds)
-##    L2.append(kk)
-## end = timer()
-## print(end-start)
+O1,L1 = [], []
+O2,L2 = [], []
+O3,L3 = [], []
+start = timer()
+for i,t in enumerate(r):
+   w = h
+   #o,oo = Oring(yso[0,:],yso[1,:],t,w,yso_map=None,grid=None)
+   #O1.append(oo)
+   k,kk = kfunc(yso[0,:],yso[1,:],t,opti=True,yso_map=None,grid=None)
+   L1.append(kk)
+   #o,oo = alls.Oring(yso[0,:],yso[1,:],t,w,AREA,bounds)
+   #O2.append(oo)
+   k,kk = alls.kfunc(yso[0,:],yso[1,:],t,AREA,bounds)
+   L2.append(kk)
+end = timer()
+print(end-start)
 
 ## ## plt.figure()
 ## ## plt.plot(r,O1,'r')
@@ -462,17 +451,17 @@ h = 1
 ## ## plt.title('Comparison of new (red), "optimised" (green) vs old (blue) Oring')
 ## ## plt.xlabel('r')
 ## ## plt.ylabel('O/lambda')
-## plt.figure()
-## plt.plot(r,L1,'r')
-## plt.plot(r,L2,'b')
-## #plt.plot(r,L3,'g')
-## plt.title('Comparison of new (red), "optimised" (green) vs old (blue) kfunc')
-## plt.xlabel('r')
-## plt.ylabel('L')
+plt.figure()
+plt.plot(r,L1,'r')
+plt.plot(r,L2,'b')
+#plt.plot(r,L3,'g')
+plt.title('Comparison of new (red), "optimised" (green) vs old (blue) kfunc')
+plt.xlabel('r')
+plt.ylabel('L')
 ## ## plt.figure()
 ## ## plt.plot(yso[0,:],yso[1,:],'*')
 ## ## plt.title('YSO positions')
 ## ## plt.xlabel('x')
 ## ## plt.ylabel('y')
 ## ## plt.axis([0,30,0,30])
-## plt.show()
+plt.show()
