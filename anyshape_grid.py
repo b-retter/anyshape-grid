@@ -363,29 +363,17 @@ def ring(xp,yp,R,w,grid=None,relative=False):
         print('xp outside of range')
     elif yp < y[0] or yp > max(y):
         print('yp outside of range')
-        
-    Rx = delDist2Grid(Rout,axis='x')
-    Ry = delDist2Grid(Rout,axis='y')
+
     xg,yg = xy2grid(xp,yp)
 
-    shape = np.shape(grid)
-    
-    x_min,x_max = max(xg-Rx-1,0), min(xg+Rx+1,shape[0])
-    y_min,y_max = max(yg-Ry-1,0), min(yg+Ry+1,shape[1])
-
-    coords = [[],[]]
-    for i in range(x_min,x_max):
-        for j in range(y_min,y_max):
-            d = np.sqrt((gx[i]-xp)**2 + (gy[j]-yp)**2)
-            if grid[i,j] == 1 and d <= Rout and d >= Rin:
-                coords[0].append(i)
-                coords[1].append(j)
-                
+    GX, GY = np.meshgrid(gx,gy)
+    dists = np.sqrt((GX-xp)**2 + (GY-yp)**2)
+    co_y,co_x = np.where((dists <= Rout) & (dists >= Rin) & (grid == 1))
     if relative == False:
-        return np.array(coords)
+        return np.array([co_x,co_y])
     elif relative == True:
-        return np.array(coords) - np.array([xg,yg]).reshape(2,1)
-
+        return np.array([co_x,co_y])-np.array([xg,yg]).reshape(2,1)
+    
 x_side = 100
 y_side = 100
 XMIN,XMAX = 0,30
@@ -420,10 +408,10 @@ coverage = np.ones((x_side,y_side))
 
 ##yso = np.array(yso)
 
-#yso = np.array([rnd.rand(Nyso)*XMAX,rnd.rand(Nyso)*YMAX])
-#yso_map = yso_to_grid(yso)
+yso = np.array([rnd.rand(Nyso)*XMAX,rnd.rand(Nyso)*YMAX])
+yso_map = yso_to_grid(yso)
 
-step = 5
+step = 10
 r = np.linspace(1.5,15,step)
 h = 1
 
@@ -433,35 +421,15 @@ O3,L3 = [], []
 start = timer()
 for i,t in enumerate(r):
    w = h
-   #o,oo = Oring(yso[0,:],yso[1,:],t,w,yso_map=None,grid=None)
-   #O1.append(oo)
-   k,kk = kfunc(yso[0,:],yso[1,:],t,opti=True,yso_map=None,grid=None)
-   L1.append(kk)
-   #o,oo = alls.Oring(yso[0,:],yso[1,:],t,w,AREA,bounds)
-   #O2.append(oo)
-   k,kk = alls.kfunc(yso[0,:],yso[1,:],t,AREA,bounds)
-   L2.append(kk)
+   o,oo = Oring(yso[0,:],yso[1,:],t,w,opti=False,yso_map=None,grid=None)
+   O1.append(oo)
+   #k,kk = kfunc(yso[0,:],yso[1,:],t,opti=True,yso_map=None,grid=None)
+   #L1.append(kk)
+   o,oo = alls.Oring(yso[0,:],yso[1,:],t,w,AREA,bounds)
+   O2.append(oo)
+   #k,kk = alls.kfunc(yso[0,:],yso[1,:],t,AREA,bounds)
+   #L2.append(kk)
+
 end = timer()
 print(end-start)
 
-## ## plt.figure()
-## ## plt.plot(r,O1,'r')
-## ## plt.plot(r,O2,'b')
-## ## plt.plot(r,O3,'g')
-## ## plt.title('Comparison of new (red), "optimised" (green) vs old (blue) Oring')
-## ## plt.xlabel('r')
-## ## plt.ylabel('O/lambda')
-plt.figure()
-plt.plot(r,L1,'r')
-plt.plot(r,L2,'b')
-#plt.plot(r,L3,'g')
-plt.title('Comparison of new (red), "optimised" (green) vs old (blue) kfunc')
-plt.xlabel('r')
-plt.ylabel('L')
-## ## plt.figure()
-## ## plt.plot(yso[0,:],yso[1,:],'*')
-## ## plt.title('YSO positions')
-## ## plt.xlabel('x')
-## ## plt.ylabel('y')
-## ## plt.axis([0,30,0,30])
-plt.show()
