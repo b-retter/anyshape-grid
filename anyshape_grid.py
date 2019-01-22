@@ -64,6 +64,15 @@ def box_check(xg,yg,Lx,Ly=None,grid=None):
     else:
         return True
 
+def circle_check(xg,yg,r,grid=None):
+    """
+    Checks if there are any cells not covered by coverage map, or
+    exceed the bounds of the coverage map within circle of radius r,
+    centered on xp,yp.
+    Returns False if not entirely within map.
+    """
+    
+    return None
 def make_grid(n_areas,n_length,n_height):
     """
     generates an arbitrary shaped region through random walking starting in the centre
@@ -201,9 +210,9 @@ def circle(xp,yp,R,grid=None,relative=False):
         
     xg,yg = xy2grid(xp,yp)
 
-    GX, GY = np.meshgrid(gx,gy)
+    GX, GY = np.meshgrid(gx,gy,indexing='ij')
     dists = np.sqrt((GX-xp)**2 + (GY-yp)**2)
-    co_y,co_x = np.where((dists <= R) & (grid == 1))
+    co_x,co_y = np.where((dists <= R) & (grid == 1))
     if relative == False:
         return np.array([co_x,co_y])
     elif relative == True:
@@ -349,7 +358,7 @@ def Oring(x,y,t,w,yso_map=None,grid=None,opti=False):
     lmda = np.sum(yso_map)/float(np.sum(grid)*dx*dy)
     O = yso_sum/float(area)
     return O, O/lmda
-
+    
 def ring(xp,yp,R,w,grid=None,relative=False):
     """
     Finds all the grid squares that are in an annulus around
@@ -371,16 +380,54 @@ def ring(xp,yp,R,w,grid=None,relative=False):
 
     xg,yg = xy2grid(xp,yp)
 
-    GX, GY = np.meshgrid(gx,gy)
+    GX, GY = np.meshgrid(gx,gy,indexing = 'ij')
     dists = np.sqrt((GX-xp)**2 + (GY-yp)**2)
-    co_y,co_x = np.where((dists <= Rout) & (dists >= Rin) & (grid == 1))
+    co_x,co_y = np.where((dists <= Rout) & (dists >= Rin) & (grid == 1))
     if relative == False:
         return np.array([co_x,co_y])
     elif relative == True:
         return np.array([co_x,co_y])-np.array([xg,yg]).reshape(2,1)
+
+def gfunc(x,y,t,yso_map=None,grid=None,opti=False):
+    """
+    Calculates Diggle's G function by calculating how many events
+    have a nearest neighbour within distance t.
+    Applying a border correction.
+    """
+    x = np.copy(x)
+    y = np.copy(y)
+
+    N = np.size(x)
+
+    X,Y = np.meshgrid(x,y)
+    x.resize((len(x),1))
+
+    dists = np.sqrt((X-x)**2 + (Y-y)**2)
+    dists[dists == 0] = np.max(dists) 
+    nearest = np.min(dists,axis=0)
+
     
-x_side = 100
-y_side = 100
+    y.resize((len(y),1))
+    #distance to closest boundary
+    close = np.minimum(np.min(np.abs(x-bounds[0,:]),axis=1),np.min(np.abs(y-bounds[1,:]),axis=1))
+    #number of points excluded
+    numBounds = sum(v > close)
+
+    #if all points are excluded
+    if numBounds == N:
+        gsum = np.sum((nearest <= v))
+        G = gsum/float(N)
+    #if not all points are excluded
+    else:
+        gsum = np.sum((nearest <= v)&(close > v))
+        G = gsum/float(N-numBounds )
+    lmda = (N)/float(area)
+    E = 1 - np.exp(-lmda*np.pi*v**2)
+    return np.array([G,E])
+    return None
+
+x_side = 1000
+y_side = 1000
 XMIN,XMAX = 0,30
 YMIN,YMAX = 0,30
 AREA = (XMAX-XMIN)*(YMAX-YMIN)
@@ -416,7 +463,7 @@ coverage = np.ones((x_side,y_side))
 yso = np.array([rnd.rand(Nyso)*XMAX,rnd.rand(Nyso)*YMAX])
 yso_map = yso_to_grid(yso)
 
-step = 10
+step = 5
 r = np.linspace(1.5,15,step)
 h = 1
 
@@ -434,7 +481,14 @@ for i,t in enumerate(r):
    O2.append(oo)
    #k,kk = alls.kfunc(yso[0,:],yso[1,:],t,AREA,bounds)
    #L2.append(kk)
-
+   o,oo = Oring2(yso[0,:],yso[1,:],t,w,opti=False,yso_map=None,grid=None)
+   O3.append(oo)
 end = timer()
 print(end-start)
+
+plt.plot(r,O1,'r',lw=2)
+plt.plot(r,O2,'b')
+plt.plot(r,O3,'g')
+plt.title('Grid based (r&g), analytical (blue)')
+plt.show()
 
