@@ -324,6 +324,7 @@ def Oring(x,y,t,w,yso_map=None,grid=None,opti=False):
     yso_sum = 0
     area_sum = 0
     for i in range(len(x)):
+        self_count = False
         xg,yg = xy2grid(x[i],y[i])
         Lx = 2*delDist2Grid(t+w,axis='x')
         Ly = 2*delDist2Grid(t+w,axis='y')
@@ -336,8 +337,12 @@ def Oring(x,y,t,w,yso_map=None,grid=None,opti=False):
 
         xg,yg = xy2grid(x[i],y[i])
         for j in range(n_coords):
-            if coords[0,j]==xg and coords[1,j]==yg:
+
+            #Allow o-ring to skip one point within its own grid square.
+            if coords[0,j]==xg and coords[1,j]==yg and self_count == False:
+                self_count = True
                 continue
+            
             yso_sum+=yso_map[coords[0,j],coords[1,j]]
     
     area = dx*dy*area_sum
