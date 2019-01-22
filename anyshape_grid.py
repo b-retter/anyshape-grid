@@ -40,7 +40,7 @@ def box_check(xg,yg,Lx,Ly=None,grid=None):
     """
     Checks if there are any cells not covered by coverage map, or
     exceed the bounds of the coverage map within box of side L,
-    centered on xp,yp.
+    centered on xg,yg.
     Returns False if not entirely within map.
     """
     if grid == None:
@@ -64,15 +64,34 @@ def box_check(xg,yg,Lx,Ly=None,grid=None):
     else:
         return True
 
-def circle_check(xg,yg,r,grid=None):
+def circle_check(xp,yp,R,grid=None):
     """
     Checks if there are any cells not covered by coverage map, or
-    exceed the bounds of the coverage map within circle of radius r,
+    exceed the bounds of the coverage map within circle of radius Rg,
     centered on xp,yp.
     Returns False if not entirely within map.
     """
+    if grid == None:
+        grid = coverage
+
+    xg,yg = xy2grid(xp,yp)
+
+    GX, GY = np.meshgrid(gx,gy,indexing='ij')
+    dists = np.sqrt((GX-xp)**2 + (GY-yp)**2)
+    co_x,co_y = np.where((dists <= R) & (grid == 0))
+    if len(co_x) == 0:
+        return False
     
-    return None
+    xg,yg = xy2grid(xp,yp)
+    Lx = delDist2Grid(2*R,axis='x')
+    Ly = delDist2Grid(2*R,axis='y')
+
+    #check if a box of side 2R is outside the coverage map
+    if box_check(xg,yg,Lx,Ly=Ly,grid=None):
+        return True
+    else:
+        return False
+
 def make_grid(n_areas,n_length,n_height):
     """
     generates an arbitrary shaped region through random walking starting in the centre
@@ -218,11 +237,13 @@ def circle(xp,yp,R,grid=None,relative=False):
     elif relative == True:
         return np.array([co_x,co_y])-np.array([xg,yg]).reshape(2,1)
     
-def yso_to_grid(yso,grid=None):
+def yso_to_grid(yso,grid=None,yso_return=False):
     """
     Make a new grid to place YSOs into using grid as a mask
     and basis of next grid.
     yso should by a 2xN array containing x and y values.
+    Optional yso_return function. Returns yso coordinates
+    that were inside coverage map.
     """
     #allow a default value of grid to be the coverage map
     if grid == None:
@@ -230,11 +251,19 @@ def yso_to_grid(yso,grid=None):
 
     yso_map = np.zeros(np.shape(grid))
         
-    N = np.shape(yso)[1]    
+    N = np.shape(yso)[1]
+    fail_count = 0
     for i in range(N):
+        x,y = xy2grid(yso[0,i],yso[1,i])
+        if x == None or y == None:
+             fail_count += 1
+             continue
         yso_map[xy2grid(yso[0,i],yso[1,i])] += 1
 
-    return yso_map
+    if fail_count > 0:
+        print('{:d} YSOs failed to position'.format(fail_count))
+        
+    return yso_map*grid
 
 def random_ysos(val,mode='binomial',grid=None):
     """
@@ -380,7 +409,7 @@ def ring(xp,yp,R,w,grid=None,relative=False):
 
     xg,yg = xy2grid(xp,yp)
 
-    GX, GY = np.meshgrid(gx,gy,indexing = 'ij')
+    GX, GY = np.meshgrid(gx,gy,indexing='ij')
     dists = np.sqrt((GX-xp)**2 + (GY-yp)**2)
     co_x,co_y = np.where((dists <= Rout) & (dists >= Rin) & (grid == 1))
     if relative == False:
@@ -388,12 +417,19 @@ def ring(xp,yp,R,w,grid=None,relative=False):
     elif relative == True:
         return np.array([co_x,co_y])-np.array([xg,yg]).reshape(2,1)
 
-def gfunc(x,y,t,yso_map=None,grid=None,opti=False):
+def gfunc(x,y,t,yso_map=None,grid=None):
     """
     Calculates Diggle's G function by calculating how many events
     have a nearest neighbour within distance t.
-    Applying a border correction.
+    Applying the border method of edge correction.
     """
+
+    if yso_map == None:
+        yso_map = yso_to_grid(np.array([x,y]),grid)
+        
+    if grid == None:
+        grid = coverage
+        
     x = np.copy(x)
     y = np.copy(y)
 
@@ -402,32 +438,103 @@ def gfunc(x,y,t,yso_map=None,grid=None,opti=False):
     X,Y = np.meshgrid(x,y)
     x.resize((len(x),1))
 
+    #collect nearest neighbour distances
     dists = np.sqrt((X-x)**2 + (Y-y)**2)
     dists[dists == 0] = np.max(dists) 
     nearest = np.min(dists,axis=0)
 
-    
-    y.resize((len(y),1))
-    #distance to closest boundary
-    close = np.minimum(np.min(np.abs(x-bounds[0,:]),axis=1),np.min(np.abs(y-bounds[1,:]),axis=1))
-    #number of points excluded
-    numBounds = sum(v > close)
+    #count number of points inside boundary with nn <= t
+    n_inside = 0
+    n_nearest = 0
+    for i in range(N):
+        if circle_check(x[i],y[i],t,grid=None):
+            n_inside += 1
+            if nearest[i] <= t:
+                n_nearest += 1
 
-    #if all points are excluded
-    if numBounds == N:
-        gsum = np.sum((nearest <= v))
+    #if all points are excluded use backup
+    if n_inside = 0:
+        gsum = np.sum(nearest <= t)
         G = gsum/float(N)
-    #if not all points are excluded
     else:
-        gsum = np.sum((nearest <= v)&(close > v))
-        G = gsum/float(N-numBounds )
-    lmda = (N)/float(area)
-    E = 1 - np.exp(-lmda*np.pi*v**2)
-    return np.array([G,E])
-    return None
+        gsum = n_nearest
+        G = gsum/float(n_inside)
 
-x_side = 1000
-y_side = 1000
+    area = get_area(grid)
+    lmda = N/area
+    E = 1 - np.exp(-lmda*np.pi*t**2)
+    return G,E
+
+def ffunc(x,y,t,a=None,b=None,yso_map=None,grid=None):
+    """
+    Calculates free space function by calculating how many events
+    have a point-event nearest neighbour within distance t.
+    Applying the border method of edge correction.
+    a and b are optional arguments for the positions used to
+    probe the space.
+    If not provided a and b will be randomly distributed over the
+    map. 
+    """
+    if yso_map == None:
+        yso_map = yso_to_grid(np.array([x,y]),grid)
+        
+    if grid == None:
+        grid = coverage
+        
+    if bool(a == None) != bool(b == None):
+        print('Provide either a AND b, or neither')
+        return None
+    elif a == None and b == None:
+        #make a and b here
+    
+        
+    x = np.copy(x)
+    y = np.copy(y)
+
+    N = np.size(x)
+
+    X,Y = np.meshgrid(x,y)
+    x.resize((len(x),1))
+
+    #collect nearest neighbour distances
+    dists = np.sqrt((X-x)**2 + (Y-y)**2)
+    dists[dists == 0] = np.max(dists) 
+    nearest = np.min(dists,axis=0)
+
+    #count number of points inside boundary with nn <= t
+    n_inside = 0
+    n_nearest = 0
+    for i in range(N):
+        if circle_check(x[i],y[i],t,grid=None):
+            n_inside += 1
+            if nearest[i] <= t:
+                n_nearest += 1
+
+    #if all points are excluded use backup
+    if n_inside = 0:
+        gsum = np.sum(nearest <= t)
+        G = gsum/float(N)
+    else:
+        gsum = n_nearest
+        G = gsum/float(n_inside)
+
+    area = get_area(grid)
+    lmda = N/area
+    E = 1 - np.exp(-lmda*np.pi*t**2)
+    return G,E
+
+def get_area(grid = None):
+    """
+    Return the effective area of the coverage map
+    as float.
+    """
+    if grid == None:
+        grid = coverage
+        
+    return float(np.sum(grid)*dx*dy)
+
+x_side = 200
+y_side = 200
 XMIN,XMAX = 0,30
 YMIN,YMAX = 0,30
 AREA = (XMAX-XMIN)*(YMAX-YMIN)
@@ -460,8 +567,8 @@ coverage = np.ones((x_side,y_side))
 
 ##yso = np.array(yso)
 
-yso = np.array([rnd.rand(Nyso)*XMAX,rnd.rand(Nyso)*YMAX])
-yso_map = yso_to_grid(yso)
+#yso = np.array([rnd.rand(Nyso)*XMAX,rnd.rand(Nyso)*YMAX])
+#yso_map = yso_to_grid(yso)
 
 step = 5
 r = np.linspace(1.5,15,step)
