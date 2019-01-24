@@ -75,22 +75,25 @@ def circle_check(xp,yp,R,grid=None):
         grid = coverage
 
     xg,yg = xy2grid(xp,yp)
+    Rx = delDist2Grid(R,axis='x')
+    Ry = delDist2Grid(R,axis='y')
+
+    #Check if bounds nearby
+    steps = map(num_to_step,range(1,5))
+    xy = np.array([xg,yg])
+    if is_wall(xy,steps[0]*(Rx),grid) or is_wall(xy,steps[2]*(Rx),grid):
+        return False
+    if is_wall(xy,steps[1]*(Ry),grid) or is_wall(xy,steps[3]*(Ry),grid):
+        return False
+    
 
     GX, GY = np.meshgrid(gx,gy,indexing='ij')
     dists = np.sqrt((GX-xp)**2 + (GY-yp)**2)
     co_x,co_y = np.where((dists <= R) & (grid == 0))
     if len(co_x) == 0:
         return False
-    
-    xg,yg = xy2grid(xp,yp)
-    Lx = delDist2Grid(2*R,axis='x')
-    Ly = delDist2Grid(2*R,axis='y')
-
-    #check if a box of side 2R is outside the coverage map
-    if box_check(xg,yg,Lx,Ly=Ly,grid=None):
-        return True
     else:
-        return False
+        return True
 
 def make_grid(n_areas,n_length,n_height):
     """
@@ -245,26 +248,38 @@ def yso_to_grid(yso,grid=None,yso_return=False):
     Optional yso_return function. Returns yso coordinates
     that were inside coverage map.
     """
+    #Check yso_return is boolean
+    if not type(yso_return) == bool:
+        print('yso_return must be a boolean')
+        return None
+    
     #allow a default value of grid to be the coverage map
-    if grid == None:
+    if grid is None:
         grid = coverage
 
     yso_map = np.zeros(np.shape(grid))
-        
+    filtered_ysos = [[],[]]
     N = np.shape(yso)[1]
     fail_count = 0
     for i in range(N):
         x,y = xy2grid(yso[0,i],yso[1,i])
-        if x == None or y == None:
+        if x is None or y is None:
              fail_count += 1
              continue
+
+        if yso_return == True:
+            filtered_ysos[0].append(yso[0,i])
+            filtered_ysos[1].append(yso[1,i])
         yso_map[xy2grid(yso[0,i],yso[1,i])] += 1
 
     if fail_count > 0:
         print('{:d} YSOs failed to position'.format(fail_count))
-        
-    return yso_map*grid
 
+    if yso_return == True:
+        return yso_map*grid, np.array(filtered_ysos)
+    elif yso_return == False:
+        return yso_map*grid
+    
 def random_ysos(val,mode='binomial',grid=None):
     """
     Function to populate a grid with random YSOs. YSOs can be placed anywhere
@@ -273,10 +288,11 @@ def random_ysos(val,mode='binomial',grid=None):
     If mode is 'binomial' randomly distribute val YSOs around the region.
     If mode is 'csr', place Poisson((val/study area)*pixel area) ysos in each pixel.
 
-    Both return the coordinates of the ysos and the completed grid. 
+    Both return the coordinates of the ysos and the completed grid.
+    Assumes a uniform probability across the coverage map.
     """
 
-    if grid == None:
+    if grid is None:
         grid = coverage
 
     shape = np.shape(grid)
@@ -290,14 +306,29 @@ def random_ysos(val,mode='binomial',grid=None):
         pixel_area = dx*dy
         for pixel in range(n_pixels):
             i,j = inside_pixels[0,pixel], inside_pixels[1,pixel]
-            yso_map[i,j] = rnd.poisson(lmda*pixel_area)
-        return yso, yso_map
+            Nyso = rnd.poisson(lmda*pixel_area)
+            yso_map[i,j] = Nyso
+
+            if Nyso > 0:
+                x = (rnd.rand(Nyso)-0.5)*dx+gx[i]
+                y = (rnd.rand(Nyso)-0.5)*dy+gy[j]
+                yso[0].append(x)
+                yso[1].append(y)
+            
+        return np.array(yso), yso_map
+    
     elif mode == 'binomial':
         while np.sum(yso_map) < val:
             rand_pixel = rnd.randint(0,n_pixels)
             i,j = inside_pixels[0,rand_pixel], inside_pixels[1,rand_pixel]
             yso_map[i,j] += 1
-        return yso, yso_map
+            
+            x = (rnd.rand()-0.5)*dx+gx[i]
+            y = (rnd.rand()-0.5)*dy+gy[j]
+            yso[0].append(x)
+            yso[1].append(y)
+            
+        return np.array(yso), yso_map
 
 def kfunc(x,y,t,yso_map=None,grid=None,opti=False):
     """
@@ -305,10 +336,10 @@ def kfunc(x,y,t,yso_map=None,grid=None,opti=False):
     Most likely x and y are the positions of yso.
     """
 
-    if yso_map == None:
+    if yso_map is None:
         yso_map = yso_to_grid(np.array([x,y]),grid)
         
-    if grid == None:
+    if grid is None:
         grid = coverage
 
     #yso will each count themselves once over the course of the 
@@ -348,10 +379,10 @@ def Oring(x,y,t,w,yso_map=None,grid=None,opti=False):
     Most likely x and y are the positions of yso.
     """
 
-    if yso_map == None:
+    if yso_map is None:
         yso_map = yso_to_grid(np.array([x,y]),grid)
         
-    if grid == None:
+    if grid is None:
         grid = coverage
 
     #Generate relative circle coords for approx centre of map
@@ -397,7 +428,7 @@ def ring(xp,yp,R,w,grid=None,relative=False):
     Otherwise provide the absolute references.
     """
     #allow a default value of grid to be the coverage map
-    if grid == None:
+    if grid is None:
         grid = coverage
 
     Rout = R+w/2.0
@@ -423,12 +454,13 @@ def gfunc(x,y,t,yso_map=None,grid=None):
     have a nearest neighbour within distance t.
     Applying the border method of edge correction.
     """
-
-    if yso_map == None:
-        yso_map = yso_to_grid(np.array([x,y]),grid)
-        
-    if grid == None:
+    
+    if grid is None:
         grid = coverage
+        
+    if yso_map is None:
+        yso_map,xy = yso_to_grid(np.array([x,y]),grid,yso_return = True)
+        x,y = xy[0,:],xy[1,:]
         
     x = np.copy(x)
     y = np.copy(y)
@@ -453,7 +485,7 @@ def gfunc(x,y,t,yso_map=None,grid=None):
                 n_nearest += 1
 
     #if all points are excluded use backup
-    if n_inside = 0:
+    if n_inside == 0:
         gsum = np.sum(nearest <= t)
         G = gsum/float(N)
     else:
@@ -475,60 +507,79 @@ def ffunc(x,y,t,a=None,b=None,yso_map=None,grid=None):
     If not provided a and b will be randomly distributed over the
     map. 
     """
-    if yso_map == None:
-        yso_map = yso_to_grid(np.array([x,y]),grid)
-        
-    if grid == None:
+    if grid is None:
         grid = coverage
-        
-    if bool(a == None) != bool(b == None):
-        print('Provide either a AND b, or neither')
-        return None
-    elif a == None and b == None:
-        #make a and b here
     
+    if yso_map is None:
+        yso_map = yso_to_grid(np.array([x,y]),grid,yso_return=True)
+        x,y = xy[0,:],xy[1,:]
+
+    #deal with random positions
+    if bool(a is None) != bool(b is None):
+        print('Provide either a and b, or neither')
+        return None
+    elif a is None and b is None:
+        #if no values given for a and b, generate N randomly
+        #spaced ysos across effective area of coverage map.
+        val = len(x)
+        ab_map, ab = random_ysos(val,'binomial',grid)
+        a,b = ab[0,:],ab[1,:]
+    else:
+        #len(a) must be equal to len(x)
+        if len(x) != len(a):
+            print('Currently x, y, a and b must all be of equal length.')
+            return None
+        else:
+            #copy a and b, filter by coverage map and return
+            a,b = np.copy(a),np.copy(b)
+            ab_map, ab = yso_to_grid(np.array([a,b]),grid,yso_return=True)
+            a,b = ab[0,:],ab[1,:]
         
     x = np.copy(x)
     y = np.copy(y)
 
     N = np.size(x)
+    
+    A,B = np.meshgrid(a,b)
+    B = B.transpose()
 
-    X,Y = np.meshgrid(x,y)
-    x.resize((len(x),1))
+    x.resize((np.size(x),1))
+    y.resize((np.size(y),1))
 
-    #collect nearest neighbour distances
-    dists = np.sqrt((X-x)**2 + (Y-y)**2)
-    dists[dists == 0] = np.max(dists) 
+    dists = np.sqrt((A-x)**2 + (B-y)**2)
     nearest = np.min(dists,axis=0)
+
+    a.resize((len(a),1))
+    b.resize((len(b),1))
 
     #count number of points inside boundary with nn <= t
     n_inside = 0
     n_nearest = 0
     for i in range(N):
-        if circle_check(x[i],y[i],t,grid=None):
+        if circle_check(a[i],b[i],t,grid=None):
             n_inside += 1
             if nearest[i] <= t:
                 n_nearest += 1
 
     #if all points are excluded use backup
-    if n_inside = 0:
-        gsum = np.sum(nearest <= t)
-        G = gsum/float(N)
+    if n_inside == 0:
+        fsum = np.sum(nearest <= t)
+        F = fsum/float(N)
     else:
-        gsum = n_nearest
-        G = gsum/float(n_inside)
+        fsum = n_nearest
+        F = fsum/float(n_inside)
 
     area = get_area(grid)
     lmda = N/area
     E = 1 - np.exp(-lmda*np.pi*t**2)
-    return G,E
+    return F,E
 
 def get_area(grid = None):
     """
     Return the effective area of the coverage map
     as float.
     """
-    if grid == None:
+    if grid is None:
         grid = coverage
         
     return float(np.sum(grid)*dx*dy)
@@ -549,7 +600,7 @@ y = np.arange(YMIN,YMAX+dy,dy)
 gx = np.linspace(XMIN,XMAX,x_side,endpoint=False) + (XMAX-XMIN)/(2.0*x_side)
 gy = np.linspace(YMIN,YMAX,y_side,endpoint=False) + (YMAX-YMIN)/(2.0*y_side)
 
-Nyso = 50
+Nyso = 500
 coverage = np.ones((x_side,y_side))
 
 ## N = 0
@@ -569,33 +620,38 @@ coverage = np.ones((x_side,y_side))
 
 #yso = np.array([rnd.rand(Nyso)*XMAX,rnd.rand(Nyso)*YMAX])
 #yso_map = yso_to_grid(yso)
+yso,yso_map = random_ysos(Nyso,mode='binomial',grid=None)
 
 step = 5
-r = np.linspace(1.5,15,step)
+r = np.linspace(0.5,5,step)
 h = 1
 
-O1,L1 = [], []
-O2,L2 = [], []
+G1,O1,L1 = [], [], []
+G2,O2,L2 = [], [], []
 O3,L3 = [], []
 start = timer()
 for i,t in enumerate(r):
    w = h
-   o,oo = Oring(yso[0,:],yso[1,:],t,w,opti=False,yso_map=None,grid=None)
-   O1.append(oo)
+   f,ff = gfunc(yso[0,:],yso[1,:],t,yso_map=None,grid=None)
+   G1.append(ff)
+   #o,oo = Oring(yso[0,:],yso[1,:],t,w,opti=False,yso_map=None,grid=None)
+   #O1.append(oo)
    #k,kk = kfunc(yso[0,:],yso[1,:],t,opti=True,yso_map=None,grid=None)
    #L1.append(kk)
-   o,oo = alls.Oring(yso[0,:],yso[1,:],t,w,AREA,bounds)
-   O2.append(oo)
+   #o,oo = alls.Oring(yso[0,:],yso[1,:],t,w,AREA,bounds)
+   #O2.append(oo)
+   a,b = rnd.rand(Nyso)*XMAX,rnd.rand(Nyso)*YMAX
+   f,ff = alls.ffunc(yso[0,:],yso[1,:],a,b,t,AREA,bounds)
+   G2.append(ff)
    #k,kk = alls.kfunc(yso[0,:],yso[1,:],t,AREA,bounds)
    #L2.append(kk)
-   o,oo = Oring2(yso[0,:],yso[1,:],t,w,opti=False,yso_map=None,grid=None)
-   O3.append(oo)
+   #o,oo = Oring2(yso[0,:],yso[1,:],t,w,opti=False,yso_map=None,grid=None)
+   #O3.append(oo)
 end = timer()
 print(end-start)
 
-plt.plot(r,O1,'r',lw=2)
-plt.plot(r,O2,'b')
-plt.plot(r,O3,'g')
-plt.title('Grid based (r&g), analytical (blue)')
+plt.plot(r,G1,'r',lw=2)
+plt.plot(r,G2,'b')
+#plt.plot(r,O3,'g')
+plt.title('Grid based (r), analytical (blue)')
 plt.show()
-
