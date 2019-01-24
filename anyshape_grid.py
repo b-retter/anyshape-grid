@@ -511,7 +511,7 @@ def ffunc(x,y,t,a=None,b=None,yso_map=None,grid=None):
         grid = coverage
     
     if yso_map is None:
-        yso_map = yso_to_grid(np.array([x,y]),grid,yso_return=True)
+        yso_map, xy = yso_to_grid(np.array([x,y]),grid,yso_return=True)
         x,y = xy[0,:],xy[1,:]
 
     #deal with random positions
@@ -522,7 +522,7 @@ def ffunc(x,y,t,a=None,b=None,yso_map=None,grid=None):
         #if no values given for a and b, generate N randomly
         #spaced ysos across effective area of coverage map.
         val = len(x)
-        ab_map, ab = random_ysos(val,'binomial',grid)
+        ab, ab_map = random_ysos(val,'binomial',grid)
         a,b = ab[0,:],ab[1,:]
     else:
         #len(a) must be equal to len(x)
@@ -584,7 +584,7 @@ def get_area(grid = None):
         
     return float(np.sum(grid)*dx*dy)
 
-x_side = 200
+x_side = 100
 y_side = 200
 XMIN,XMAX = 0,30
 YMIN,YMAX = 0,30
@@ -632,7 +632,7 @@ O3,L3 = [], []
 start = timer()
 for i,t in enumerate(r):
    w = h
-   f,ff = gfunc(yso[0,:],yso[1,:],t,yso_map=None,grid=None)
+   f,ff = ffunc(yso[0,:],yso[1,:],t,yso_map=None,grid=None)
    G1.append(ff)
    #o,oo = Oring(yso[0,:],yso[1,:],t,w,opti=False,yso_map=None,grid=None)
    #O1.append(oo)
