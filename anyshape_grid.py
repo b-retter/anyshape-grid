@@ -43,9 +43,9 @@ def box_check(xg,yg,Lx,Ly=None,grid=None):
     centered on xg,yg.
     Returns False if not entirely within map.
     """
-    if grid == None:
+    if grid is None:
         grid = coverage
-    if Ly == None:
+    if Ly is None:
         Ly = Lx
         
     #Check if bounds nearby
@@ -71,7 +71,7 @@ def circle_check(xp,yp,R,grid=None):
     centered on xp,yp.
     Returns False if not entirely within map.
     """
-    if grid == None:
+    if grid is None:
         grid = coverage
 
     xg,yg = xy2grid(xp,yp)
@@ -148,7 +148,7 @@ def index2x(index,axis,grid=None):
     the grid square indicated by index.
     """
     #allow a default value of grid to be the coverage map
-    if grid == None:
+    if grid is None:
         grid = coverage
 
     #check if index is within coverage map
@@ -222,7 +222,7 @@ def circle(xp,yp,R,grid=None,relative=False):
     Otherwise provide the absolute references.
     """
     #allow a default value of grid to be the coverage map
-    if grid == None:
+    if grid is None:
         grid = coverage
 
     if xp < x[0] or xp > x[-1]:
@@ -585,7 +585,7 @@ def get_area(grid = None):
     return float(np.sum(grid)*dx*dy)
 
 x_side = 100
-y_side = 200
+y_side = 100
 XMIN,XMAX = 0,30
 YMIN,YMAX = 0,30
 AREA = (XMAX-XMIN)*(YMAX-YMIN)
@@ -626,32 +626,30 @@ step = 5
 r = np.linspace(0.5,5,step)
 h = 1
 
-G1,O1,L1 = [], [], []
-G2,O2,L2 = [], [], []
-O3,L3 = [], []
+O1,L1 = [], []
+O2,L2 = [], []
 start = timer()
 for i,t in enumerate(r):
    w = h
-   f,ff = ffunc(yso[0,:],yso[1,:],t,yso_map=None,grid=None)
-   G1.append(ff)
-   #o,oo = Oring(yso[0,:],yso[1,:],t,w,opti=False,yso_map=None,grid=None)
-   #O1.append(oo)
-   #k,kk = kfunc(yso[0,:],yso[1,:],t,opti=True,yso_map=None,grid=None)
-   #L1.append(kk)
-   #o,oo = alls.Oring(yso[0,:],yso[1,:],t,w,AREA,bounds)
-   #O2.append(oo)
-   a,b = rnd.rand(Nyso)*XMAX,rnd.rand(Nyso)*YMAX
-   f,ff = alls.ffunc(yso[0,:],yso[1,:],a,b,t,AREA,bounds)
-   G2.append(ff)
-   #k,kk = alls.kfunc(yso[0,:],yso[1,:],t,AREA,bounds)
-   #L2.append(kk)
-   #o,oo = Oring2(yso[0,:],yso[1,:],t,w,opti=False,yso_map=None,grid=None)
-   #O3.append(oo)
+   o,oo = Oring(yso[0,:],yso[1,:],t,w,yso_map=None,grid=None)
+   O1.append(oo)
+   k,kk = kfunc(yso[0,:],yso[1,:],t,yso_map=None,grid=None)
+   L1.append(kk)
+   o,oo = alls.Oring(yso[0,:],yso[1,:],t,w,AREA,bounds)
+   O2.append(oo)
+   k,kk = alls.kfunc(yso[0,:],yso[1,:],t,AREA,bounds)
+   L2.append(kk)
+
 end = timer()
 print(end-start)
 
-plt.plot(r,G1,'r',lw=2)
-plt.plot(r,G2,'b')
-#plt.plot(r,O3,'g')
-plt.title('Grid based (r), analytical (blue)')
+plt.figure()
+plt.plot(r,O1,'r',lw=2)
+plt.plot(r,O2,'b')
+plt.title('O-ring. Grid based (r), analytical (blue)')
+
+plt.figure()
+plt.plot(r,L1,'r',lw=2)
+plt.plot(r,L2,'b')
+plt.title('L. Grid based (r), analytical (blue)')
 plt.show()
