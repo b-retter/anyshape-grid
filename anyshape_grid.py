@@ -586,8 +586,8 @@ def get_area(grid = None):
 
 x_side = 100
 y_side = 100
-XMIN,XMAX = 0,30
-YMIN,YMAX = 0,30
+XMIN,XMAX = 0,40
+YMIN,YMAX = 0,40
 AREA = (XMAX-XMIN)*(YMAX-YMIN)
 dx = (XMAX-XMIN)/float(x_side)
 dy = (YMAX-YMIN)/float(y_side)
@@ -600,56 +600,46 @@ y = np.arange(YMIN,YMAX+dy,dy)
 gx = np.linspace(XMIN,XMAX,x_side,endpoint=False) + (XMAX-XMIN)/(2.0*x_side)
 gy = np.linspace(YMIN,YMAX,y_side,endpoint=False) + (YMAX-YMIN)/(2.0*y_side)
 
-Nyso = 500
 coverage = np.ones((x_side,y_side))
 
-## N = 0
-## yso = [[],[]]
-## while N < Nyso:
-##     xx = (rnd.rand(Nyso-N)-0.5)*2*R
-##     yy = (rnd.rand(Nyso-N)-0.5)*2*R
-##     for i in range(Nyso-N):
-##         d = np.sqrt(xx[i]**2 + yy[i]**2)
-##         if d <= R:
-##             yso[0].append(xx[i]+x0)
-##             yso[1].append(yy[i]+y0)
-##             N+=1
-
-
-##yso = np.array(yso)
-
-#yso = np.array([rnd.rand(Nyso)*XMAX,rnd.rand(Nyso)*YMAX])
-#yso_map = yso_to_grid(yso)
-yso,yso_map = random_ysos(Nyso,mode='binomial',grid=None)
-
-step = 5
-r = np.linspace(0.5,5,step)
+xp,yp = 10,10
 h = 1
+r = np.linspace(h/2.0+0.1,20,100)
+a_circ,a_ring = [],[]
+an_circ,an_ring = [],[]
+for R in r:
+    coords = ring(xp,yp,R,h,grid=None,relative=False)
+    n_coords = np.shape(coords)[1]
+    area_sum = n_coords*dx*dy
+    a_ring.append(area_sum)
 
-O1,L1 = [], []
-O2,L2 = [], []
-start = timer()
-for i,t in enumerate(r):
-   w = h
-   o,oo = Oring(yso[0,:],yso[1,:],t,w,yso_map=None,grid=None)
-   O1.append(oo)
-   k,kk = kfunc(yso[0,:],yso[1,:],t,yso_map=None,grid=None)
-   L1.append(kk)
-   o,oo = alls.Oring(yso[0,:],yso[1,:],t,w,AREA,bounds)
-   O2.append(oo)
-   k,kk = alls.kfunc(yso[0,:],yso[1,:],t,AREA,bounds)
-   L2.append(kk)
+    coords = circle(xp,yp,R,grid=None,relative=False)
+    n_coords = np.shape(coords)[1]
+    area_sum = n_coords*dx*dy
+    a_circ.append(area_sum)
 
-end = timer()
-print(end-start)
+    weight = alls.weight(xp,yp,R,bounds)
+    an_circ.append((1/weight)*np.pi*R**2)
+
+    weight = alls.Oweight(xp,yp,R,2*h,bounds)
+    an_ring.append(1/float(weight))
+
+
+def smooth(y, box_pts):
+    box = np.ones(box_pts)/box_pts
+    y_smooth = np.convolve(y, box, mode='same')
+    return y_smooth
 
 plt.figure()
-plt.plot(r,O1,'r',lw=2)
-plt.plot(r,O2,'b')
-plt.title('O-ring. Grid based (r), analytical (blue)')
+plt.plot(r,a_ring/(2*np.pi*r),'b')
 
 plt.figure()
-plt.plot(r,L1,'r',lw=2)
-plt.plot(r,L2,'b')
-plt.title('L. Grid based (r), analytical (blue)')
+plt.plot(r,a_circ/(np.pi*r**2),'b')
+
+plt.figure()
+plt.plot(r,an_circ/(np.pi*r**2),'b')
+
+plt.figure()
+plt.plot(r,an_ring,'b')
+
 plt.show()
