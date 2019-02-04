@@ -4,7 +4,7 @@ import numpy as np
 import numpy.random as rnd
 import matplotlib.pyplot as plt
 import sys
-sys.path.append('/Users/bretter/Documents/StarFormation/RandomDistribution/spatialStats/Functions')
+sys.path.append('../allstats_examples/')
 import allstats as alls
 from timeit import default_timer as timer
 
@@ -584,10 +584,10 @@ def get_area(grid = None):
         
     return float(np.sum(grid)*dx*dy)
 
-x_side = 100
-y_side = 100
-XMIN,XMAX = 0,30
-YMIN,YMAX = 0,30
+x_side = 220
+y_side = 220
+XMIN,XMAX = 0,62
+YMIN,YMAX = 0,62
 AREA = (XMAX-XMIN)*(YMAX-YMIN)
 dx = (XMAX-XMIN)/float(x_side)
 dy = (YMAX-YMIN)/float(y_side)
@@ -600,7 +600,7 @@ y = np.arange(YMIN,YMAX+dy,dy)
 gx = np.linspace(XMIN,XMAX,x_side,endpoint=False) + (XMAX-XMIN)/(2.0*x_side)
 gy = np.linspace(YMIN,YMAX,y_side,endpoint=False) + (YMAX-YMIN)/(2.0*y_side)
 
-Nyso = 500
+Nyso = 100
 coverage = np.ones((x_side,y_side))
 
 ## N = 0
@@ -620,10 +620,13 @@ coverage = np.ones((x_side,y_side))
 
 #yso = np.array([rnd.rand(Nyso)*XMAX,rnd.rand(Nyso)*YMAX])
 #yso_map = yso_to_grid(yso)
-yso,yso_map = random_ysos(Nyso,mode='binomial',grid=None)
+#yso,yso_map = random_ysos(Nyso,mode='binomial',grid=None)
+xx = rnd.rand(Nyso)*30+16
+yy = rnd.rand(Nyso)*30+16
+yso = np.array([xx,yy])
 
-step = 5
-r = np.linspace(0.5,5,step)
+step = 20
+r = np.linspace(1.5,15,step)
 h = 1
 
 O1,L1 = [], []
@@ -631,7 +634,7 @@ O2,L2 = [], []
 start = timer()
 for i,t in enumerate(r):
    w = h
-   o,oo = Oring(yso[0,:],yso[1,:],t,w,yso_map=None,grid=None)
+   o,oo = Oring(yso[0,:],yso[1,:],t,2*w,yso_map=None,grid=None)
    O1.append(oo)
    k,kk = kfunc(yso[0,:],yso[1,:],t,yso_map=None,grid=None)
    L1.append(kk)
@@ -649,7 +652,22 @@ plt.plot(r,O2,'b')
 plt.title('O-ring. Grid based (r), analytical (blue)')
 
 plt.figure()
+O1 = np.array(O1)
+O2 = np.array(O2)
+plt.plot(r,O2-O1)
+plt.title('O-ring. Analytical-Grid based')
+
+plt.figure()
 plt.plot(r,L1,'r',lw=2)
 plt.plot(r,L2,'b')
 plt.title('L. Grid based (r), analytical (blue)')
+
+plt.figure()
+L1 = np.array(L1)
+L2 = np.array(L2)
+plt.plot(r,L2-L1)
+plt.title('L. Analytical-Grid based')
+
 plt.show()
+
+
