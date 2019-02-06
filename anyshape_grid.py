@@ -584,10 +584,13 @@ def get_area(grid = None):
         
     return float(np.sum(grid)*dx*dy)
 
-x_side = 220
-y_side = 220
-XMIN,XMAX = 0,62
-YMIN,YMAX = 0,62
+
+
+n_side = np.array([25,75,225,675])
+x_side = 25
+y_side = 25
+XMIN,XMAX = 0,30
+YMIN,YMAX = 0,30
 AREA = (XMAX-XMIN)*(YMAX-YMIN)
 dx = (XMAX-XMIN)/float(x_side)
 dy = (YMAX-YMIN)/float(y_side)
@@ -599,75 +602,90 @@ x = np.arange(XMIN,XMAX+dx,dx)
 y = np.arange(YMIN,YMAX+dy,dy)
 gx = np.linspace(XMIN,XMAX,x_side,endpoint=False) + (XMAX-XMIN)/(2.0*x_side)
 gy = np.linspace(YMIN,YMAX,y_side,endpoint=False) + (YMAX-YMIN)/(2.0*y_side)
-
+    
 Nyso = 100
 coverage = np.ones((x_side,y_side))
+yso_map = np.copy(coverage)*2
+    
+while np.any(yso_map > 1):
+    xx = rnd.randint(0,x_side,Nyso)
+    yy = rnd.randint(0,y_side,Nyso)
+    
+    yso = np.array([gx[xx],gy[yy]])
+    yso_map = yso_to_grid(yso)
 
-## N = 0
-## yso = [[],[]]
-## while N < Nyso:
-##     xx = (rnd.rand(Nyso-N)-0.5)*2*R
-##     yy = (rnd.rand(Nyso-N)-0.5)*2*R
-##     for i in range(Nyso-N):
-##         d = np.sqrt(xx[i]**2 + yy[i]**2)
-##         if d <= R:
-##             yso[0].append(xx[i]+x0)
-##             yso[1].append(yy[i]+y0)
-##             N+=1
+for res in n_side:
+    x_side = res
+    y_side = res
+    XMIN,XMAX = 0,30
+    YMIN,YMAX = 0,30
+    AREA = (XMAX-XMIN)*(YMAX-YMIN)
+    dx = (XMAX-XMIN)/float(x_side)
+    dy = (YMAX-YMIN)/float(y_side)
+    
+    bounds = np.array([[XMIN,XMAX],[YMIN,YMAX]])
+    
+    #central coordinates of the grid squares
+    x = np.arange(XMIN,XMAX+dx,dx)
+    y = np.arange(YMIN,YMAX+dy,dy)
+    gx = np.linspace(XMIN,XMAX,x_side,endpoint=False) + (XMAX-XMIN)/(2.0*x_side)
+    gy = np.linspace(YMIN,YMAX,y_side,endpoint=False) + (YMAX-YMIN)/(2.0*y_side)
+    
+    Nyso = 100
+    coverage = np.ones((x_side,y_side))
+    
+    #yso = np.array([rnd.rand(Nyso)*XMAX,rnd.rand(Nyso)*YMAX])
+    #yso_map = yso_to_grid(yso)
+    #yso,yso_map = random_ysos(Nyso,mode='binomial',grid=None)
+    
+    step = 20
+    r = np.linspace(1.5,15,step)
+    h = 1
+    O1,L1 = [], []
+    O2,L2 = [], []
+    start = timer()
+    for i,t in enumerate(r):
+        w = h
+        o,oo = Oring(yso[0,:],yso[1,:],t,2*w,yso_map=None,grid=None)
+        O1.append(oo)
+        k,kk = kfunc(yso[0,:],yso[1,:],t,yso_map=None,grid=None)
+        L1.append(kk)
+        o,oo = alls.Oring(yso[0,:],yso[1,:],t,w,AREA,bounds)
+        O2.append(oo)
+        k,kk = alls.kfunc(yso[0,:],yso[1,:],t,AREA,bounds)
+        L2.append(kk)
+        
+    end = timer()
+    print(end-start)
 
-
-##yso = np.array(yso)
-
-#yso = np.array([rnd.rand(Nyso)*XMAX,rnd.rand(Nyso)*YMAX])
-#yso_map = yso_to_grid(yso)
-#yso,yso_map = random_ysos(Nyso,mode='binomial',grid=None)
-xx = rnd.rand(Nyso)*30+16
-yy = rnd.rand(Nyso)*30+16
-yso = np.array([xx,yy])
-
-step = 20
-r = np.linspace(1.5,15,step)
-h = 1
-
-O1,L1 = [], []
-O2,L2 = [], []
-start = timer()
-for i,t in enumerate(r):
-   w = h
-   o,oo = Oring(yso[0,:],yso[1,:],t,2*w,yso_map=None,grid=None)
-   O1.append(oo)
-   k,kk = kfunc(yso[0,:],yso[1,:],t,yso_map=None,grid=None)
-   L1.append(kk)
-   o,oo = alls.Oring(yso[0,:],yso[1,:],t,w,AREA,bounds)
-   O2.append(oo)
-   k,kk = alls.kfunc(yso[0,:],yso[1,:],t,AREA,bounds)
-   L2.append(kk)
-
-end = timer()
-print(end-start)
-
-plt.figure()
-plt.plot(r,O1,'r',lw=2)
-plt.plot(r,O2,'b')
-plt.title('O-ring. Grid based (r), analytical (blue)')
-
-plt.figure()
-O1 = np.array(O1)
-O2 = np.array(O2)
-plt.plot(r,O2-O1)
-plt.title('O-ring. Analytical-Grid based')
-
-plt.figure()
-plt.plot(r,L1,'r',lw=2)
-plt.plot(r,L2,'b')
-plt.title('L. Grid based (r), analytical (blue)')
-
-plt.figure()
-L1 = np.array(L1)
-L2 = np.array(L2)
-plt.plot(r,L2-L1)
-plt.title('L. Analytical-Grid based')
-
-plt.show()
+    fpath = '/Users/bretter/Documents/StarFormation/Meetings/meeting06-02-19/grid_centre/'
+    
+    plt.figure()
+    plt.plot(r,O1,'r',lw=3)
+    plt.plot(r,O2,'b')
+    plt.title('O-ring. Grid based (r), analytical (blue)')
+    plt.savefig('{:s}O_{:d}'.format(fpath,res))
+    
+    plt.figure()
+    O1 = np.array(O1)
+    O2 = np.array(O2)
+    plt.plot(r,O2-O1)
+    plt.title('O-ring. Analytical-Grid based')
+    plt.savefig('{:s}Odiff_{:d}'.format(fpath,res))
+    
+    plt.figure()
+    plt.plot(r,L1,'r',lw=3)
+    plt.plot(r,L2,'b')
+    plt.title('L. Grid based (r), analytical (blue)')
+    plt.savefig('{:s}L_{:d}'.format(fpath,res))
+    
+    plt.figure()
+    L1 = np.array(L1)
+    L2 = np.array(L2)
+    plt.plot(r,L2-L1)
+    plt.title('L. Analytical-Grid based')
+    plt.savefig('{:s}Ldiff_{:d}'.format(fpath,res))
+    
+    plt.close('all')
 
 
