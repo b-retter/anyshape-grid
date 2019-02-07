@@ -330,7 +330,7 @@ def random_ysos(val,mode='binomial',grid=None):
             
         return np.array(yso), yso_map
 
-def kfunc(x,y,t,yso_map=None,grid=None,opti=False):
+def kfunc(x,y,t,yso_map=None,grid=None,opti=False,diag=False):
     """
     Calculates K function for points with coords x,y.
     Most likely x and y are the positions of yso.
@@ -371,9 +371,12 @@ def kfunc(x,y,t,yso_map=None,grid=None,opti=False):
     lmda = np.sum(yso_map)/float(np.sum(grid)*dx*dy)
     K = np.pi*t**2/lmda*yso_sum/float(area)
     L = np.sqrt(K/np.pi) - t
-    return K, L
+    if diag == True:
+        return K,L,yso_sum,float(area)
+    else:
+        return K, L
 
-def Oring(x,y,t,w,yso_map=None,grid=None,opti=False):
+def Oring(x,y,t,w,yso_map=None,grid=None,opti=False,diag=False):
     """
     Calculates Oring function for points with coords x,y.
     Most likely x and y are the positions of yso.
@@ -417,7 +420,10 @@ def Oring(x,y,t,w,yso_map=None,grid=None,opti=False):
     area = dx*dy*area_sum
     lmda = np.sum(yso_map)/float(np.sum(grid)*dx*dy)
     O = yso_sum/float(area)
-    return O, O/lmda
+    if diag == True:
+        return O, O/lmda, yso_sum, float(area)
+    else:
+        return O, O/lmda
     
 def ring(xp,yp,R,w,grid=None,relative=False):
     """
