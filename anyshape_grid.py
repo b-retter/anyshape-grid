@@ -585,12 +585,12 @@ def get_area(grid = None):
     return float(np.sum(grid)*dx*dy)
 
 
-
 n_side = np.array([25,75,225,675])
 x_side = 25
 y_side = 25
 XMIN,XMAX = 0,30
 YMIN,YMAX = 0,30
+
 AREA = (XMAX-XMIN)*(YMAX-YMIN)
 dx = (XMAX-XMIN)/float(x_side)
 dy = (YMAX-YMIN)/float(y_side)
@@ -604,6 +604,7 @@ gx = np.linspace(XMIN,XMAX,x_side,endpoint=False) + (XMAX-XMIN)/(2.0*x_side)
 gy = np.linspace(YMIN,YMAX,y_side,endpoint=False) + (YMAX-YMIN)/(2.0*y_side)
     
 Nyso = 100
+
 coverage = np.ones((x_side,y_side))
 yso_map = np.copy(coverage)*2
     
