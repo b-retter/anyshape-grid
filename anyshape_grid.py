@@ -4,7 +4,8 @@ import numpy as np
 import numpy.random as rnd
 import matplotlib.pyplot as plt
 import sys
-sys.path.append('../allstats_examples/')
+#'/Users/bretter/Documents/StarFormation/RandomDistribution/spatialStats/Functions'
+sys.path.append('/Users/bretter/Documents/StarFormation/RandomDistribution/spatialStats/Functions')
 import allstats as alls
 from timeit import default_timer as timer
 
@@ -609,7 +610,7 @@ y = np.arange(YMIN,YMAX+dy,dy)
 gx = np.linspace(XMIN,XMAX,x_side,endpoint=False) + (XMAX-XMIN)/(2.0*x_side)
 gy = np.linspace(YMIN,YMAX,y_side,endpoint=False) + (YMAX-YMIN)/(2.0*y_side)
     
-Nyso = 100
+Nyso = 50
 
 coverage = np.ones((x_side,y_side))
 yso_map = np.copy(coverage)*2
@@ -640,7 +641,6 @@ for i,res in enumerate(n_side):
     gx = np.linspace(XMIN,XMAX,x_side,endpoint=False) + (XMAX-XMIN)/(2.0*x_side)
     gy = np.linspace(YMIN,YMAX,y_side,endpoint=False) + (YMAX-YMIN)/(2.0*y_side)
     
-    Nyso = 100
     coverage = np.ones((x_side,y_side))
     
     #yso = np.array([rnd.rand(Nyso)*XMAX,rnd.rand(Nyso)*YMAX])
@@ -657,52 +657,21 @@ for i,res in enumerate(n_side):
         w = h
         #Get all grid information
         o,o2,o3,o4 = Oring(yso[0,:],yso[1,:],t,2*w,yso_map=None,grid=None,diag=True)
-        results[i,0,0,0,:],results[i,0,0,1,:],results[i,0,0,2,:] = o2,o3,o4
+        results[i,0,0,0,j],results[i,0,0,1,j],results[i,0,0,2,j] = o2,o3,o4
         
-        k,k2,k3 = kfunc(yso[0,:],yso[1,:],t,yso_map=None,grid=None,diag=True)
-        results[i,1,0,0,:],results[i,1,0,1,:],results[i,1,0,2,:] = k2,k3,k4
+        k,k2,k3,k4 = kfunc(yso[0,:],yso[1,:],t,yso_map=None,grid=None,diag=True)
+        results[i,1,0,0,j],results[i,1,0,1,j],results[i,1,0,2,j] = k2,k3,k4
 
         #Get all analytical information
-        o,o2,o3,o4 = alls.Oring(yso[0,:],yso[1,:],t,w,AREA,bounds,diag=True)
-        results[i,0,1,0,:],results[i,0,1,1,:],results[i,0,1,2,:] = o2,o3,o4
+        o,o2,o3,o4 = alls.Oring(yso[0,:],yso[1,:],t,w,AREA,bounds,True)
+        results[i,0,1,0,j],results[i,0,1,1,j],results[i,0,1,2,j] = o2,o3,o4
         
-        k,k2,k3 = alls.kfunc(yso[0,:],yso[1,:],t,AREA,bounds,diag=True)
-        results[i,1,1,0,:],results[i,1,1,1,:],results[i,1,1,2,:] = k2,k3,k4
+        k,k2,k3,k4 = alls.kfunc(yso[0,:],yso[1,:],t,AREA,bounds,True)
+        results[i,1,1,0,j],results[i,1,1,1,j],results[i,1,1,2,j] = k2,k3,k4
 
             
     end = timer()
     print(end-start)
 
-np.save('grid_centre_all_stats',results)
-
-#    fpath = '/Users/bretter/Documents/StarFormation/Meetings/meeting06-02-19/grid_centre/'
-#    
-#    plt.figure()
-#    plt.plot(r,O1,'r',lw=3)
-#    plt.plot(r,O2,'b')
-#    plt.title('O-ring. Grid based (r), analytical (blue)')
-#    plt.savefig('{:s}O_{:d}'.format(fpath,res))
-    
-#    plt.figure()
-#    O1 = np.array(O1)
-#    O2 = np.array(O2)
-#    plt.plot(r,O2-O1)
-#    plt.title('O-ring. Analytical-Grid based')
-#    plt.savefig('{:s}Odiff_{:d}'.format(fpath,res))
-    
-#    plt.figure()
-#    plt.plot(r,L1,'r',lw=3)
-#    plt.plot(r,L2,'b')
-#    plt.title('L. Grid based (r), analytical (blue)')
-#    plt.savefig('{:s}L_{:d}'.format(fpath,res))
-    
-#    plt.figure()
-#    L1 = np.array(L1)
-#    L2 = np.array(L2)
-#    plt.plot(r,L2-L1)
-#    plt.title('L. Analytical-Grid based')
-#    plt.savefig('{:s}Ldiff_{:d}'.format(fpath,res))
-    
-#    plt.close('all')
-
+np.save('grid_centre_all_stats_50_2',results)
 
