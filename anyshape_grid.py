@@ -4,7 +4,8 @@ import numpy as np
 import numpy.random as rnd
 import matplotlib.pyplot as plt
 import sys
-#'/Users/bretter/Documents/StarFormation/RandomDistribution/spatialStats/Functions'
+
+#/Users/bretter/Documents/StarFormation/RandomDistribution/spatialStats/Functions
 sys.path.append('/Users/bretter/Documents/StarFormation/RandomDistribution/spatialStats/Functions')
 import allstats as alls
 from timeit import default_timer as timer
@@ -592,9 +593,9 @@ def get_area(grid = None):
     return float(np.sum(grid)*dx*dy)
 
 
-n_side = np.array([25,75,225,675])
-x_side = 25
-y_side = 25
+n_side = 3**np.arange(3,7)
+x_side = n_side[0]
+y_side = n_side[0]
 XMIN,XMAX = 0,30
 YMIN,YMAX = 0,30
 
@@ -615,14 +616,15 @@ Nyso = 50
 coverage = np.ones((x_side,y_side))
 yso_map = np.copy(coverage)*2
     
-while np.any(yso_map > 1):
-    xx = rnd.randint(0,x_side,Nyso)
-    yy = rnd.randint(0,y_side,Nyso)
-    
-    yso = np.array([gx[xx],gy[yy]])
-    yso_map = yso_to_grid(yso)
+#while np.any(yso_map > 1):
+#    xx = rnd.randint(0,x_side,Nyso)
+#    yy = rnd.randint(0,y_side,Nyso)
+#    
+#    yso = np.array([gx[xx],gy[yy]])
+#    yso_map = yso_to_grid(yso)
 
-steps = 20
+yso = np.array([gx[[12,14]],gy[[13,13]]])
+steps = 30
 results = np.empty((len(n_side),2,2,3,steps))
 for i,res in enumerate(n_side):
     x_side = res
@@ -657,21 +659,21 @@ for i,res in enumerate(n_side):
         w = h
         #Get all grid information
         o,o2,o3,o4 = Oring(yso[0,:],yso[1,:],t,2*w,yso_map=None,grid=None,diag=True)
-        results[i,0,0,0,j],results[i,0,0,1,j],results[i,0,0,2,j] = o2,o3,o4
+        results[i,0,0,0,j],results[i,0,0,1,j],results[i,0,0,2,j] = o,o3,o4
         
         k,k2,k3,k4 = kfunc(yso[0,:],yso[1,:],t,yso_map=None,grid=None,diag=True)
-        results[i,1,0,0,j],results[i,1,0,1,j],results[i,1,0,2,j] = k2,k3,k4
+        results[i,1,0,0,j],results[i,1,0,1,j],results[i,1,0,2,j] = k,k3,k4
 
         #Get all analytical information
         o,o2,o3,o4 = alls.Oring(yso[0,:],yso[1,:],t,w,AREA,bounds,True)
-        results[i,0,1,0,j],results[i,0,1,1,j],results[i,0,1,2,j] = o2,o3,o4
+        results[i,0,1,0,j],results[i,0,1,1,j],results[i,0,1,2,j] = o,o3,o4
         
         k,k2,k3,k4 = alls.kfunc(yso[0,:],yso[1,:],t,AREA,bounds,True)
-        results[i,1,1,0,j],results[i,1,1,1,j],results[i,1,1,2,j] = k2,k3,k4
+        results[i,1,1,0,j],results[i,1,1,1,j],results[i,1,1,2,j] = k,k3,k4
 
             
     end = timer()
     print(end-start)
 
-np.save('grid_centre_all_stats_50_2',results)
+np.save('2ysos',results)
 

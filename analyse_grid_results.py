@@ -18,7 +18,7 @@ for i in range(shape[0]):
     K = results[i,1,:,:,:]
 
     test = ['stat','count','area']
-    res = [25,75,225,675]
+    res = [ 27,  81, 243, 729]
     for k in range(shape[3]):
         plt.figure()
         plt.plot(r,O[0,k,:],'r',lw=3)
