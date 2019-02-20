@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import sys
 
 #/Users/bretter/Documents/StarFormation/RandomDistribution/spatialStats/Functions
-sys.path.append('../allstats_examples')
+sys.path.append('/Users/bretter/Documents/StarFormation/RandomDistribution/spatialStats/Functions')
 import allstats as alls
 from timeit import default_timer as timer
 
@@ -368,10 +368,10 @@ def kfunc(x,y,t,yso_map=None,grid=None,opti=False,diag=False):
         
         for j in range(n_coords):
             yso_sum+=yso_map[coords[0,j],coords[1,j]]
-    
+
     area = dx*dy*area_sum
     lmda = np.sum(yso_map)/float(np.sum(grid)*dx*dy)
-    K = np.pi*t**2/lmda*yso_sum/float(area)
+    K = (np.pi*t**2/lmda)*yso_sum/float(area)
     L = np.sqrt(K/np.pi) - t
     if diag == True:
         return K,L,yso_sum,float(area)
@@ -415,12 +415,10 @@ def kfunc2(x,y,t,yso_map=None,grid=None,opti=False,diag=False):
         yso_sum.append([-1])
         for j in range(n_coords):
             yso_sum[i]+=yso_map[coords[0,j],coords[1,j]]
-    
     area = float(dx)*dy*np.array(area_sum)
     yso_sum = np.array(yso_sum).reshape(len(x))
-
     lmda = np.sum(yso_map)/float(np.sum(grid)*dx*dy)
-    K = np.pi*t**2/lmda*(np.sum(yso_sum/area))
+    K = np.pi*t**2/(lmda*len(x))*(np.sum(yso_sum/area))
     L = np.sqrt(K/np.pi) - t
     if diag == True:
         return K,L,np.sum(yso_sum),np.sum(area)
@@ -642,7 +640,7 @@ def get_area(grid = None):
     return float(np.sum(grid)*dx*dy)
 
 
-n_side = [ 27,  81, 243, 729]
+n_side = [ 27,  81, 243]
 x_side = n_side[0]
 y_side = n_side[0]
 XMIN,XMAX = 0,30
@@ -660,7 +658,7 @@ y = np.arange(YMIN,YMAX+dy,dy)
 gx = np.linspace(XMIN,XMAX,x_side,endpoint=False) + (XMAX-XMIN)/(2.0*x_side)
 gy = np.linspace(YMIN,YMAX,y_side,endpoint=False) + (YMAX-YMIN)/(2.0*y_side)
     
-Nyso = 100
+Nyso = 50
 
 coverage = np.ones((x_side,y_side))
 yso_map = np.copy(coverage)*2
@@ -672,7 +670,7 @@ while np.any(yso_map > 1):
     yso = np.array([gx[xx],gy[yy]])
     yso_map = yso_to_grid(yso)
 
-steps = 5
+steps = 10
 results = np.empty((len(n_side),2,2,3,steps))
 for i,res in enumerate(n_side):
     x_side = res
@@ -710,18 +708,18 @@ for i,res in enumerate(n_side):
         results[i,0,0,0,j],results[i,0,0,1,j],results[i,0,0,2,j] = o,o3,o4
         
         k,k2,k3,k4 = kfunc2(yso[0,:],yso[1,:],t,yso_map=None,grid=None,diag=True)
-        results[i,1,0,0,j],results[i,1,0,1,j],results[i,1,0,2,j] = k,k3,k4
+        results[i,1,0,0,j],results[i,1,0,1,j],results[i,1,0,2,j] = k2,k3,k4
 
         #Get all analytical information
-        o,o2 = alls.Oring(yso[0,:],yso[1,:],t,w,AREA,bounds)
+        o,o2,o3,o4 = alls.Oring(yso[0,:],yso[1,:],t,w,AREA,bounds,diag=True)
         results[i,0,1,0,j],results[i,0,1,1,j],results[i,0,1,2,j] = o,o3,o4
         
-        k,k2 = alls.kfunc(yso[0,:],yso[1,:],t,AREA,bounds)
-        results[i,1,1,0,j],results[i,1,1,1,j],results[i,1,1,2,j] = k,k3,k4
+        k,k2,k3,k4 = alls.kfunc(yso[0,:],yso[1,:],t,AREA,bounds,diag=True)
+        results[i,1,1,0,j],results[i,1,1,1,j],results[i,1,1,2,j] = k2,k3,k4
 
             
     end = timer()
     print(end-start)
 
-np.save('new_k_test',results)
+np.save('new_k_test2',results)
 
