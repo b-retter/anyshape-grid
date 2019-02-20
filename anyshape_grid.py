@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import sys
 
 #/Users/bretter/Documents/StarFormation/RandomDistribution/spatialStats/Functions
-sys.path.append('/Users/bretter/Documents/StarFormation/RandomDistribution/spatialStats/Functions')
+sys.path.append('../allstats_examples')
 import allstats as alls
 from timeit import default_timer as timer
 
@@ -378,6 +378,55 @@ def kfunc(x,y,t,yso_map=None,grid=None,opti=False,diag=False):
     else:
         return K, L
 
+def kfunc2(x,y,t,yso_map=None,grid=None,opti=False,diag=False):
+    """
+    Calculates K function for points with coords x,y.
+    Most likely x and y are the positions of yso.
+    """
+
+    if yso_map is None:
+        yso_map = yso_to_grid(np.array([x,y]),grid)
+        
+    if grid is None:
+        grid = coverage
+
+    #yso will each count themselves once over the course of the 
+    #algorithm. This accounts for the self-counting.
+    yso_sum = -np.sum(yso_map)
+    yso_sum = []
+    area_sum = []
+
+    #Generate relative circle coords for approx centre of map
+    shape = np.shape(yso_map)
+    x_mid,y_mid = ij2xy(shape[0]/2,shape[1]/2)
+    mid_coords = circle(x_mid,y_mid,t,np.ones(shape),relative=True)
+    
+    for i in range(len(x)):
+        xg,yg = xy2grid(x[i],y[i])
+        Lx = 2*delDist2Grid(t,axis='x')
+        Ly = 2*delDist2Grid(t,axis='y')
+        if opti == True and box_check(xg,yg,Lx,Ly,grid=grid):
+            coords = np.copy(mid_coords)+np.array([xg,yg]).reshape(2,1)
+        else:
+            coords = circle(x[i],y[i],t,grid)
+                
+        n_coords = np.shape(coords)[1]
+        area_sum.append(n_coords)
+        yso_sum.append([-1])
+        for j in range(n_coords):
+            yso_sum[i]+=yso_map[coords[0,j],coords[1,j]]
+    
+    area = float(dx)*dy*np.array(area_sum)
+    yso_sum = np.array(yso_sum).reshape(len(x))
+
+    lmda = np.sum(yso_map)/float(np.sum(grid)*dx*dy)
+    K = np.pi*t**2/lmda*(np.sum(yso_sum/area))
+    L = np.sqrt(K/np.pi) - t
+    if diag == True:
+        return K,L,np.sum(yso_sum),np.sum(area)
+    else:
+        return K, L
+
 def Oring(x,y,t,w,yso_map=None,grid=None,opti=False,diag=False):
     """
     Calculates Oring function for points with coords x,y.
@@ -593,7 +642,7 @@ def get_area(grid = None):
     return float(np.sum(grid)*dx*dy)
 
 
-n_side = 3**np.arange(3,7)
+n_side = [ 27,  81, 243, 729]
 x_side = n_side[0]
 y_side = n_side[0]
 XMIN,XMAX = 0,30
@@ -611,20 +660,19 @@ y = np.arange(YMIN,YMAX+dy,dy)
 gx = np.linspace(XMIN,XMAX,x_side,endpoint=False) + (XMAX-XMIN)/(2.0*x_side)
 gy = np.linspace(YMIN,YMAX,y_side,endpoint=False) + (YMAX-YMIN)/(2.0*y_side)
     
-Nyso = 50
+Nyso = 100
 
 coverage = np.ones((x_side,y_side))
 yso_map = np.copy(coverage)*2
     
-#while np.any(yso_map > 1):
-#    xx = rnd.randint(0,x_side,Nyso)
-#    yy = rnd.randint(0,y_side,Nyso)
-#    
-#    yso = np.array([gx[xx],gy[yy]])
-#    yso_map = yso_to_grid(yso)
+while np.any(yso_map > 1):
+    xx = rnd.randint(0,x_side,Nyso)
+    yy = rnd.randint(0,y_side,Nyso)
+    
+    yso = np.array([gx[xx],gy[yy]])
+    yso_map = yso_to_grid(yso)
 
-yso = np.array([gx[[12,14]],gy[[13,13]]])
-steps = 30
+steps = 5
 results = np.empty((len(n_side),2,2,3,steps))
 for i,res in enumerate(n_side):
     x_side = res
@@ -661,19 +709,19 @@ for i,res in enumerate(n_side):
         o,o2,o3,o4 = Oring(yso[0,:],yso[1,:],t,2*w,yso_map=None,grid=None,diag=True)
         results[i,0,0,0,j],results[i,0,0,1,j],results[i,0,0,2,j] = o,o3,o4
         
-        k,k2,k3,k4 = kfunc(yso[0,:],yso[1,:],t,yso_map=None,grid=None,diag=True)
+        k,k2,k3,k4 = kfunc2(yso[0,:],yso[1,:],t,yso_map=None,grid=None,diag=True)
         results[i,1,0,0,j],results[i,1,0,1,j],results[i,1,0,2,j] = k,k3,k4
 
         #Get all analytical information
-        o,o2,o3,o4 = alls.Oring(yso[0,:],yso[1,:],t,w,AREA,bounds,True)
+        o,o2 = alls.Oring(yso[0,:],yso[1,:],t,w,AREA,bounds)
         results[i,0,1,0,j],results[i,0,1,1,j],results[i,0,1,2,j] = o,o3,o4
         
-        k,k2,k3,k4 = alls.kfunc(yso[0,:],yso[1,:],t,AREA,bounds,True)
+        k,k2 = alls.kfunc(yso[0,:],yso[1,:],t,AREA,bounds)
         results[i,1,1,0,j],results[i,1,1,1,j],results[i,1,1,2,j] = k,k3,k4
 
             
     end = timer()
     print(end-start)
 
-np.save('2ysos',results)
+np.save('new_k_test',results)
 

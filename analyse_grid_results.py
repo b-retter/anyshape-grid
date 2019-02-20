@@ -8,11 +8,11 @@ def LtoK(L,r):
     
 ##Read in data
 
-results = np.load('grid_centre_all_stats_50_1.npy')
+results = np.load('new_k_test.npy')
 #(# of resolutions, {O-ring, K} , {grid, analytical}, {Stat, Count, area}, radial steps)
 shape = np.shape(results)
 
-fpath = '/Users/bretter/Documents/StarFormation/RandomDistribution/spatialStats/GridBased/figs/50'
+fpath = '/Users/brendanretter/Documents/GridBased/figs/new_k'
 for i in range(shape[0]):
     O = results[i,0,:,:,:]
     K = results[i,1,:,:,:]
