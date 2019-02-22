@@ -4,9 +4,12 @@ import numpy as np
 import numpy.random as rnd
 import matplotlib.pyplot as plt
 import sys
+import os
+from astropy.io import fits
+from astropy import wcs
 
 #/Users/bretter/Documents/StarFormation/RandomDistribution/spatialStats/Functions
-sys.path.append('/Users/bretter/Documents/StarFormation/RandomDistribution/spatialStats/Functions')
+sys.path.append('../allstats_examples')
 import allstats as alls
 from timeit import default_timer as timer
 
@@ -592,12 +595,36 @@ def get_area(grid = None):
         
     return float(np.sum(grid)*dx*dy)
 
+"""
+Extract the relevant data from the fits file. 
+Array size.
+Make a wcs object.
+Array of grid square coordinates.
+Array of grid centre coordinates.
+Coverage map.
+"""
 
-n_side = [ 27,  81, 243]
-x_side = n_side[0]
-y_side = n_side[0]
-XMIN,XMAX = 0,30
-YMIN,YMAX = 0,30
+fits_path = '/Users/brendanretter/Documents/SFR_data'
+fits_name = 'SERAQU_IRAC1234M1_cov_sm.fits'
+coverage,header = fits.getdata(os.path.join(fits_path,fits_name), header=True)
+w_obj = wcs.WCS(header)
+##Find which axis is RA and which is Dec.
+##inverted kayword defines if axes are RA and Dec or
+##Dec and RA.
+if 'DEC' in header['CTYPE1']:
+    inverted = True
+    dec_axis = header['NAXIS1']
+    ra_axis = header['NAXIS2']
+else:
+    inverted = False
+    ra_axis = header['NAXIS1']
+    dec_axis = header['NAXIS2']
+
+y_side = header['NAXIS1']
+x_side = header['NAXIS2']
+
+YMIN, XMIN = w_obj.all_pix2world(0,0,0)
+YMAX, XMAX = w_obj.all_pix2world(y_side,x_side,0)
 
 AREA = (XMAX-XMIN)*(YMAX-YMIN)
 dx = (XMAX-XMIN)/float(x_side)
@@ -605,74 +632,15 @@ dy = (YMAX-YMIN)/float(y_side)
 
 bounds = np.array([[XMIN,XMAX],[YMIN,YMAX]])
 
-#central coordinates of the grid squares
-x = np.arange(XMIN,XMAX+dx,dx)
-y = np.arange(YMIN,YMAX+dy,dy)
-gx = np.linspace(XMIN,XMAX,x_side,endpoint=False) + (XMAX-XMIN)/(2.0*x_side)
-gy = np.linspace(YMIN,YMAX,y_side,endpoint=False) + (YMAX-YMIN)/(2.0*y_side)
-    
-Nyso = 50
+l = max(x_side,y_side)
+y,x = w_obj.all_pix2world(np.arange(l),np.arange(l),0)
+y = y[:y_side]
+x = x[:x_side]
 
-coverage = np.ones((x_side,y_side))
-yso_map = np.copy(coverage)*2
-    
-while np.any(yso_map > 1):
-    xx = rnd.randint(0,x_side,Nyso)
-    yy = rnd.randint(0,y_side,Nyso)
-    
-    yso = np.array([gx[xx],gy[yy]])
-    yso_map = yso_to_grid(yso)
+gy,gx = w_obj.all_pix2world(np.arange(0.5,l),np.arange(0.5,l),0)
+gy = gy[:y_side-1]
+gx = gx[:x_side-1]
 
-steps = 10
-results = np.empty((len(n_side),2,2,3,steps))
-for i,res in enumerate(n_side):
-    x_side = res
-    y_side = res
-    XMIN,XMAX = 0,30
-    YMIN,YMAX = 0,30
-    AREA = (XMAX-XMIN)*(YMAX-YMIN)
-    dx = (XMAX-XMIN)/float(x_side)
-    dy = (YMAX-YMIN)/float(y_side)
-    
-    bounds = np.array([[XMIN,XMAX],[YMIN,YMAX]])
-    
-    #central coordinates of the grid squares
-    x = np.arange(XMIN,XMAX+dx,dx)
-    y = np.arange(YMIN,YMAX+dy,dy)
-    gx = np.linspace(XMIN,XMAX,x_side,endpoint=False) + (XMAX-XMIN)/(2.0*x_side)
-    gy = np.linspace(YMIN,YMAX,y_side,endpoint=False) + (YMAX-YMIN)/(2.0*y_side)
-    
-    coverage = np.ones((x_side,y_side))
-    
-    #yso = np.array([rnd.rand(Nyso)*XMAX,rnd.rand(Nyso)*YMAX])
-    #yso_map = yso_to_grid(yso)
-    #yso,yso_map = random_ysos(Nyso,mode='binomial',grid=None)
-    
-    step = steps
-    r = np.linspace(1.5,15,step)
-    h = 1
-    O1,L1 = [], []
-    O2,L2 = [], []
-    start = timer()
-    for j,t in enumerate(r):
-        w = h
-        #Get all grid information
-        o,o2,o3,o4 = Oring(yso[0,:],yso[1,:],t,2*w,yso_map=None,grid=None,diag=True)
-        results[i,0,0,0,j],results[i,0,0,1,j],results[i,0,0,2,j] = o,o3,o4
-        
-        k,k2,k3,k4 = kfunc2(yso[0,:],yso[1,:],t,yso_map=None,grid=None,diag=True)
-        results[i,1,0,0,j],results[i,1,0,1,j],results[i,1,0,2,j] = k2,k3,k4
-
-        #Get all analytical information
-        o,o2,o3,o4 = alls.Oring(yso[0,:],yso[1,:],t,w,AREA,bounds,diag=True)
-        results[i,0,1,0,j],results[i,0,1,1,j],results[i,0,1,2,j] = o,o3,o4
-        
-        k,k2,k3,k4 = alls.kfunc(yso[0,:],yso[1,:],t,AREA,bounds,diag=True)
-        results[i,1,1,0,j],results[i,1,1,1,j],results[i,1,1,2,j] = k2,k3,k4
-
-            
-    end = timer()
-    print(end-start)
-
-np.save('new_k_test2',results)
-
+print(np.shape(coverage))
+plt.imshow(coverage)
+plt.show()
