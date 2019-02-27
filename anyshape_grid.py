@@ -641,6 +641,16 @@ gy,gx = w_obj.all_pix2world(np.arange(0.5,l),np.arange(0.5,l),0)
 gy = gy[:y_side-1]
 gx = gx[:x_side-1]
 
-print(np.shape(coverage))
-plt.imshow(coverage)
+Nyso = 70
+cov2 = np.zeros(np.shape(coverage))
+cov2 += coverage == 1
+
+coverage = cov2.T
+
+yso, yso_map = random_ysos(Nyso,mode='binomial',grid=None)
+
+
+X,Y = np.meshgrid(x,y)
+plt.pcolormesh(X,Y,coverage)
+plt.plot(yso[0,:],yso[1,:],'*')
 plt.show()
