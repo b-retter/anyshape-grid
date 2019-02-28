@@ -9,7 +9,7 @@ from astropy.io import fits
 from astropy import wcs
 
 #/Users/bretter/Documents/StarFormation/RandomDistribution/spatialStats/Functions
-sys.path.append('../allstats_examples')
+sys.path.append('/Users/bretter/Documents/StarFormation/RandomDistribution/spatialStats/Functions')
 import allstats as alls
 from timeit import default_timer as timer
 
@@ -72,7 +72,7 @@ def box_check(xg,yg,Lx,Ly=None,grid=None):
 def circle_check(xp,yp,R,grid=None):
     """
     Checks if there are any cells not covered by coverage map, or
-    exceed the bounds of the coverage map within circle of radius Rg,
+    exceed the bounds of the coverage map within circle of radius R,
     centered on xp,yp.
     Returns False if not entirely within map.
     """
@@ -96,9 +96,9 @@ def circle_check(xp,yp,R,grid=None):
     dists = np.sqrt((GX-xp)**2 + (GY-yp)**2)
     co_x,co_y = np.where((dists <= R) & (grid == 0))
     if len(co_x) == 0:
-        return False
-    else:
         return True
+    else:
+        return False
 
 def make_grid(n_areas,n_length,n_height):
     """
@@ -147,64 +147,34 @@ def make_grid(n_areas,n_length,n_height):
 
     return grid
 
-def index2x(index,axis,grid=None):
+def xy2grid(v1,v2,wcs_obj=None):
     """
-    Returns the x (or y) value equal to the midpoint of
-    the grid square indicated by index.
+    convert world coordinates (v1,v2) to grid coordinates
+    (i,j).
     """
-    #allow a default value of grid to be the coverage map
-    if grid is None:
-        grid = coverage
+    if wcs_obj is None:
+        wcs_obj = w_obj
 
-    #check if index is within coverage map
-    if axis == 'x':
-        if index >= np.shape(grid)[0]:
-            print('Index out of range for x')
-            return None
-        dx = x[1]-x[0]
-        return index*dx + dx/2.0 + x[0]
-    elif axis == 'y':
-        if index >= np.shape(grid)[1]:
-            print('Index out of range for y')
-            return None
-        dy = y[1]-y[0]
-        return index*dy + dy/2.0 + y[0]
+    if inverted == True:
+        j,i = wcs_obj.all_world2pix(v2,v1,0)
     else:
-        print("axis designation required: 'x' or 'y'")
-        return None
+        i,j = wcs_obj.all_world2pix(v1,v2,0)
+        
+    return i,j
 
-def x2index(v,axis):
+def ij2xy(i,j,wcs_obj=None):
     """
-    Finds the grid index for a given point on x
-    or y axis.
+    convert grid coordinates (i,j) to world coordinates.
     """
     
-    if axis == 'x':
-        if v < x[0] or v > max(x):
-            print('x value is outside of range')
-            return None
-        elif v == x[0]:
-            return 0
-        else:
-            dx = x[1]-x[0]
-            return int(round((v-x[0])/float(dx)-0.5))
-    elif axis == 'y':
-        if v < y[0] or v > max(y):
-            print('y value is outside of range')
-            return None
-        if v == y[0]:
-            return 0
-        else:
-            dy = y[1]-y[0]
-            return int(round((v-y[0])/float(dy)-0.5))
-    else:
-        print('axis designation required')
-        return None
+    if wcs_obj is None:
+        wcs_obj = w_obj
 
-def xy2grid(v1,v2):
-    return x2index(v1,'x'),x2index(v2,'y')
-def ij2xy(i,j):
-    return index2x(i,'x'),index2x(j,'y')
+    if inverted == True:
+        y,x = wcs_obj.all_pix2world(j,i,0)
+    else:
+        x,y = wcs_obj.all_pix2world(i,j,0)
+    return x,y
 
 def delDist2Grid(v2,v1=0,axis=None):
     if axis == 'x':
@@ -217,6 +187,23 @@ def delGrid2Dist(i2,i1=0,axis=None):
         return (i2-i1)*dx
     if axis == 'y':
         return (i2-i1)*dy
+
+def inside_check(v1,v2,wcs_obj=None):
+    """
+    Checks if coordinates (RA,Dec) are inside of coverage
+    map given by wcs_obj.
+    Returns False if not inside coverage map.
+    """
+    if wcs_obj is None:
+        wcs_obj = w_obj
+    if inverted == True:
+        cdec,cra = wcs_obj.all_world2pix(v2,v1,0)
+    else:
+        cra,cdec = wcs_obj.all_world2pix(v1,v2,0)
+    if  0 <= cra < ra_axis and 0 <= cdec < dec_axis:
+        return True
+    else:
+        return False
     
 def circle(xp,yp,R,grid=None,relative=False):
     """
@@ -230,10 +217,8 @@ def circle(xp,yp,R,grid=None,relative=False):
     if grid is None:
         grid = coverage
 
-    if xp < x[0] or xp > x[-1]:
-        print('xp outside of range')
-    elif yp < y[0] or yp > y[-1]:
-        print('yp outside of range')
+    if not inside_check(xp,yp):
+        print('world coordinate outside coverage map')
         
     xg,yg = xy2grid(xp,yp)
 
@@ -444,10 +429,9 @@ def ring(xp,yp,R,w,grid=None,relative=False):
 
     Rout = R+w/2.0
     Rin = R-w/2.0
-    if xp < x[0] or xp > max(x):
-        print('xp outside of range')
-    elif yp < y[0] or yp > max(y):
-        print('yp outside of range')
+    
+    if not inside_check(xp,yp):
+        print('world coordinate outside coverage map')
 
     xg,yg = xy2grid(xp,yp)
 
@@ -604,7 +588,7 @@ Array of grid centre coordinates.
 Coverage map.
 """
 
-fits_path = '/Users/brendanretter/Documents/SFR_data'
+fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
 fits_name = 'SERAQU_IRAC1234M1_cov_sm.fits'
 coverage,header = fits.getdata(os.path.join(fits_path,fits_name), header=True)
 w_obj = wcs.WCS(header)
@@ -615,10 +599,15 @@ if 'DEC' in header['CTYPE1']:
     inverted = True
     dec_axis = header['NAXIS1']
     ra_axis = header['NAXIS2']
+    dx = header['CDELT2']
+    dy = header['CDELT1']
 else:
     inverted = False
+    coverage = coverage.T
     ra_axis = header['NAXIS1']
     dec_axis = header['NAXIS2']
+    dx = header['CDELT1']
+    dy = header['CDELT2']
 
 y_side = header['NAXIS1']
 x_side = header['NAXIS2']
@@ -631,6 +620,20 @@ dx = (XMAX-XMIN)/float(x_side)
 dy = (YMAX-YMIN)/float(y_side)
 
 bounds = np.array([[XMIN,XMAX],[YMIN,YMAX]])
+
+
+gx = np.linspace(XMIN,XMAX,x_side,endpoint=False) + (XMAX-XMIN)/(2.0*x_side)
+gy = np.linspace(YMIN,YMAX,y_side,endpoint=False) + (YMAX-YMIN)/(2.0*y_side)
+gx = np.arange(x_side)
+gy = np.arange(y_side)
+GX,GY = np.meshgrid(gx,gy,indexing='ij')
+GX,GY = GX.flatten(), GY.flatten()
+gy,gx = w_obj.all_pix2world(GY,GX,0)
+gx, gy = gx.reshape(ra_axis,dec_axis), gy.reshape(ra_axis,dec_axis)
+xref = 275.812423
+yref = -3.091872
+dists = np.sqrt((gx-xref)**2+(gy-yref)**2)
+print(np.where(dists==0))
 
 l = max(x_side,y_side)
 y,x = w_obj.all_pix2world(np.arange(l),np.arange(l),0)
@@ -645,12 +648,20 @@ Nyso = 70
 cov2 = np.zeros(np.shape(coverage))
 cov2 += coverage == 1
 
-coverage = cov2.T
+coverage = cov2
+print(np.shape(coverage))
+yso, yso_map = random_ysos(Nyso,mode='binomial',grid=coverage)
 
-yso, yso_map = random_ysos(Nyso,mode='binomial',grid=None)
 
 
 X,Y = np.meshgrid(x,y)
-plt.pcolormesh(X,Y,coverage)
+plt.pcolormesh(X,Y,coverage.T)
 plt.plot(yso[0,:],yso[1,:],'*')
 plt.show()
+
+A,B = np.meshgrid(range(x_side),range(y_side))
+A = A.flatten()
+B = B.flatten()
+
+x,y = w_obj.all_pix2world(A,B,0)
+x,y = w_obj.all_world2pix(0,0,0)
