@@ -579,6 +579,24 @@ def get_area(grid = None):
         
     return float(np.sum(grid)*dx*dy)
 
+def gcircle(p1,p2):
+    """
+    Returns the central angle between two angular
+    coordinates.
+    p1 and p2 must be tuples of form (ra,dec).
+    """
+    #conversion from degrees to radians.
+    d2r = lambda x: x*np.pi/180.0
+    x0,y0 = d2r(p1[0]),d2r(p1[1])
+    x1,y1 = d2r(p2[0]),d2r(p2[1])
+
+    #Using Vincenty Great Circle Formula
+    dra = np.abs(x0-x1)
+    s1 = np.sqrt((np.cos(y1)*np.sin(dra))**2+(np.cos(y0)*np.sin(y1)-np.sin(y0)*np.cos(y1)*np.cos(dra))**2)
+    s2 = np.sin(y0)*np.sin(y1)+np.cos(y0)*np.cos(y1)*np.cos(dra)
+    sep = np.arctan(s1/s2)
+    return sep*180/np.pi
+
 """
 Extract the relevant data from the fits file. 
 Array size.
@@ -663,5 +681,8 @@ A,B = np.meshgrid(range(x_side),range(y_side))
 A = A.flatten()
 B = B.flatten()
 
-x,y = w_obj.all_pix2world(A,B,0)
-x,y = w_obj.all_world2pix(0,0,0)
+y,x = w_obj.all_pix2world(A,B,0)
+#x,y = w_obj.all_world2pix(0,0,0)
+
+y0,x0 = w_obj.all_world2pix(0,0,0)
+seps = gcircle((x0,y0),(y,x))
