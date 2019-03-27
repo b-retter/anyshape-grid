@@ -220,10 +220,7 @@ def circle(xp,yp,R,grid=None,relative=False):
     if not inside_check(xp,yp):
         print('world coordinate outside coverage map')
         
-    xg,yg = xy2grid(xp,yp)
-
-    GX, GY = np.meshgrid(gx,gy,indexing='ij')
-    dists = np.sqrt((GX-xp)**2 + (GY-yp)**2)
+    dists = np.abs(gcircle((GX,GY),(xp,yp)))
     co_x,co_y = np.where((dists <= R) & (grid == 1))
     if relative == False:
         return np.array([co_x,co_y])
@@ -343,13 +340,8 @@ def kfunc(x,y,t,yso_map=None,grid=None,opti=False,diag=False):
     mid_coords = circle(x_mid,y_mid,t,np.ones(shape),relative=True)
     
     for i in range(len(x)):
-        xg,yg = xy2grid(x[i],y[i])
-        Lx = 2*delDist2Grid(t,axis='x')
-        Ly = 2*delDist2Grid(t,axis='y')
-        if opti == True and box_check(xg,yg,Lx,Ly,grid=grid):
-            coords = np.copy(mid_coords)+np.array([xg,yg]).reshape(2,1)
-        else:
-            coords = circle(x[i],y[i],t,grid)
+
+        coords = circle(x[i],y[i],t,grid)
                 
         n_coords = np.shape(coords)[1]
         area_sum += n_coords
@@ -387,13 +379,8 @@ def Oring(x,y,t,w,yso_map=None,grid=None,opti=False,diag=False):
     area_sum = 0
     for i in range(len(x)):
         self_count = False
-        xg,yg = xy2grid(x[i],y[i])
-        Lx = 2*delDist2Grid(t+w,axis='x')
-        Ly = 2*delDist2Grid(t+w,axis='y')
-        if opti == True and box_check(xg,yg,Lx,Ly,grid=grid):
-            coords = np.copy(mid_coords)+np.array([xg,yg]).reshape(2,1)
-        else:
-            coords = ring(x[i],y[i],t,w,grid)
+
+        coords = ring(x[i],y[i],t,w,grid)
         n_coords = np.shape(coords)[1]
         area_sum += n_coords
 
@@ -433,10 +420,7 @@ def ring(xp,yp,R,w,grid=None,relative=False):
     if not inside_check(xp,yp):
         print('world coordinate outside coverage map')
 
-    xg,yg = xy2grid(xp,yp)
-
-    GX, GY = np.meshgrid(gx,gy,indexing='ij')
-    dists = np.sqrt((GX-xp)**2 + (GY-yp)**2)
+    dists = gcircle((GX,GY),(xp,yp))
     co_x,co_y = np.where((dists <= Rout) & (dists >= Rin) & (grid == 1))
     if relative == False:
         return np.array([co_x,co_y])
@@ -650,6 +634,7 @@ gy,gx = w_obj.all_pix2world(GY,GX,0)
 gx, gy = gx.reshape(ra_axis,dec_axis), gy.reshape(ra_axis,dec_axis)
 xref = 275.812423
 yref = -3.091872
+seps = gcircle((gx,gy),(xref,yref))
 dists = np.sqrt((gx-xref)**2+(gy-yref)**2)
 print(np.where(dists==0))
 
@@ -684,5 +669,10 @@ B = B.flatten()
 y,x = w_obj.all_pix2world(A,B,0)
 #x,y = w_obj.all_world2pix(0,0,0)
 
-y0,x0 = w_obj.all_world2pix(0,0,0)
+y0,x0 = w_obj.all_pix2world(0,0,0)
 seps = gcircle((x0,y0),(y,x))
+c1 = SkyCoord(x0,y0,unit='deg')
+c2 = SkyCoord(0,0,unit='deg')
+sep = c1.separation(c2)
+print(sep)
+print(gcircle((x0,y0),(0,0)))
