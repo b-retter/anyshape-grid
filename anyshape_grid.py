@@ -626,27 +626,33 @@ bounds = np.array([[XMIN,XMAX],[YMIN,YMAX]])
 
 gx = np.linspace(XMIN,XMAX,x_side,endpoint=False) + (XMAX-XMIN)/(2.0*x_side)
 gy = np.linspace(YMIN,YMAX,y_side,endpoint=False) + (YMAX-YMIN)/(2.0*y_side)
+
+##Getting pixel scales
+d2r = lambda x: x*np.pi/180.0
+gx = np.arange(x_side+1)
+gy = np.arange(y_side+1)
+GX,GY = np.meshgrid(gx,gy,indexing='ij')
+GX,GY = GX.flatten(), GY.flatten()
+gy,gx = w_obj.all_pix2world(GY,GX,0)
+gx, gy = gx.reshape(ra_axis+1,dec_axis+1), gy.reshape(ra_axis+1,dec_axis+1)
+dx = gx[1:x_side+1,:y_side]-gx[:x_side,:y_side]
+dely = gy[1:x_side+1,:y_side]-gy[:x_side,:y_side]
+theta = np.arctan(dely/dx)
+dy = gy[:x_side,1:y_side+1]-gy[:x_side,:y_side]
+angle_part = np.sin(np.pi/2-gy[:x_side,:y_side]*np.pi/180)
+#celestial steradians for all pixels
+da = angle_part*(dx*dy)/(np.cos(theta)**2)
+
+##Getting pixel locations
 gx = np.arange(x_side)
 gy = np.arange(y_side)
 GX,GY = np.meshgrid(gx,gy,indexing='ij')
 GX,GY = GX.flatten(), GY.flatten()
 gy,gx = w_obj.all_pix2world(GY,GX,0)
-gx, gy = gx.reshape(ra_axis,dec_axis), gy.reshape(ra_axis,dec_axis)
-xref = 275.812423
-yref = -3.091872
-seps = gcircle((gx,gy),(xref,yref))
-dists = np.sqrt((gx-xref)**2+(gy-yref)**2)
-print(np.where(dists==0))
+#gx, gy = gx.reshape(ra_axis,dec_axis), gy.reshape(ra_axis,dec_axis)
 
-l = max(x_side,y_side)
-y,x = w_obj.all_pix2world(np.arange(l),np.arange(l),0)
-y = y[:y_side]
-x = x[:x_side]
-
-gy,gx = w_obj.all_pix2world(np.arange(0.5,l),np.arange(0.5,l),0)
-gy = gy[:y_side-1]
-gx = gx[:x_side-1]
-
+plt.plot(gx,gy,'.')
+plt.show()
 Nyso = 70
 cov2 = np.zeros(np.shape(coverage))
 cov2 += coverage == 1
@@ -657,22 +663,7 @@ yso, yso_map = random_ysos(Nyso,mode='binomial',grid=coverage)
 
 
 
-X,Y = np.meshgrid(x,y)
-plt.pcolormesh(X,Y,coverage.T)
-plt.plot(yso[0,:],yso[1,:],'*')
-plt.show()
-
-A,B = np.meshgrid(range(x_side),range(y_side))
-A = A.flatten()
-B = B.flatten()
-
-y,x = w_obj.all_pix2world(A,B,0)
-#x,y = w_obj.all_world2pix(0,0,0)
-
-y0,x0 = w_obj.all_pix2world(0,0,0)
-seps = gcircle((x0,y0),(y,x))
-c1 = SkyCoord(x0,y0,unit='deg')
-c2 = SkyCoord(0,0,unit='deg')
-sep = c1.separation(c2)
-print(sep)
-print(gcircle((x0,y0),(0,0)))
+#X,Y = np.meshgrid(x,y)
+#plt.pcolormesh(X,Y,coverage.T)
+#plt.plot(yso[0,:],yso[1,:],'*')
+#plt.show()
