@@ -9,7 +9,7 @@ from astropy.io import fits
 from astropy import wcs
 
 #/Users/bretter/Documents/StarFormation/RandomDistribution/spatialStats/Functions
-sys.path.append('/Users/bretter/Documents/StarFormation/RandomDistribution/spatialStats/Functions')
+sys.path.append('../allstats_examples')
 import allstats as alls
 from timeit import default_timer as timer
 
@@ -281,7 +281,8 @@ def random_ysos(val,mode='binomial',grid=None):
     n_pixels = np.shape(inside_pixels)[1]
     
     yso_map = np.zeros(shape)
-    yso = [[],[]]
+    yso_x = []
+    yso_y = []
     if mode == 'csr':
         total_area = get_area()
         lmda = val/total_area
@@ -295,10 +296,11 @@ def random_ysos(val,mode='binomial',grid=None):
                     y,x = w_obj.all_pix2world(rnd.rand(Nyso)+j,rnd.rand(Nyso)+i,0)
                 else:
                     x,y = w_obj.all_pix2world(rnd.rand(Nyso)+i,rnd.rand(Nyso)+j,0)
-                yso[0].append(x.tolist())
-                yso[1].append(y.tolist())
+
+                yso_x = np.append(yso_x,x)
+                yso_y = np.append(yso_y,y)
             
-        return np.array(yso), yso_map
+        return np.vstack([yso_x,yso_y]), yso_map
     
     elif mode == 'binomial':
         while np.sum(yso_map) < val:
@@ -620,7 +622,8 @@ Array of grid centre coordinates.
 Coverage map.
 """
 
-fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
+#fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
+fits_path = '../SFR_data'
 fits_name = 'SERAQU_IRAC1234M1_cov_sm.fits'
 coverage,header = fits.getdata(os.path.join(fits_path,fits_name), header=True)
 w_obj = wcs.WCS(header)
@@ -653,7 +656,7 @@ coverage = cov2
 ##Getting pixel scales
 area_array = get_area_array()
 total_area = np.sum(area_array)
-uniq = get_area()/area_array[0,0]
+uniq = get_area()/(10*area_array[0,0])
 
 print(np.shape(coverage))
 yso, yso_map = random_ysos(uniq,mode='csr',grid=coverage)
