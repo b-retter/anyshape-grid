@@ -581,6 +581,36 @@ def gcircle(p1,p2):
     sep = np.arctan(s1/s2)
     return sep*180/np.pi
 
+def get_areas():
+    """
+    Return the celestial pixel areas for each pixel
+    in the FITS file.
+    Assumes pixels are small and can be approximated 
+    by rectangles rotated with respect to lines of const ra.
+    """
+
+    #Find RA and Dec at each grid coordinate
+    gx = np.arange(ra_axis+1)
+    gy = np.arange(dec_axis+1)
+    GX,GY = np.meshgrid(gx,gy,indexing='ij')
+    GX,GY = GX.flatten(), GY.flatten()
+    gy,gx = w_obj.all_pix2world(GY,GX,0)
+    gx, gy = gx.reshape(ra_axis+1,dec_axis+1), gy.reshape(ra_axis+1,dec_axis+1)
+
+    #Find dRA_ij = RA_{i+1},j - RA_ij and likewise for dec
+    dRA = gx[1:ra_axis+1,:dec_axis]-gx[:ra_axis,:dec_axis]
+    dDec = gy[:ra_axis,1:dec_axis+1]-gy[:ra_axis,:dec_axis]
+
+    #Due to rotation a step in grid changes both ra and dec.
+    #Calculate angle between lines of constant Ra and the
+    #grid at constant i.
+    dely = gy[1:ra_axis+1,:dec_axis]-gy[:ra_axis,:dec_axis]
+    theta = np.arctan(dely/dRA)
+
+    angle_part = np.sin(np.pi/2-gy[:ra_axis,:dec_axis]*np.pi/180.0)
+    #celestial steradians for all pixels
+    return angle_part*(dRa*dDec)/(np.cos(theta)**2)
+
 """
 Extract the relevant data from the fits file. 
 Array size.
@@ -601,58 +631,23 @@ if 'DEC' in header['CTYPE1']:
     inverted = True
     dec_axis = header['NAXIS1']
     ra_axis = header['NAXIS2']
-    dx = header['CDELT2']
-    dy = header['CDELT1']
 else:
     inverted = False
     coverage = coverage.T
     ra_axis = header['NAXIS1']
     dec_axis = header['NAXIS2']
-    dx = header['CDELT1']
-    dy = header['CDELT2']
 
-y_side = header['NAXIS1']
-x_side = header['NAXIS2']
-
-YMIN, XMIN = w_obj.all_pix2world(0,0,0)
-YMAX, XMAX = w_obj.all_pix2world(y_side,x_side,0)
-
-AREA = (XMAX-XMIN)*(YMAX-YMIN)
-dx = (XMAX-XMIN)/float(x_side)
-dy = (YMAX-YMIN)/float(y_side)
-
-bounds = np.array([[XMIN,XMAX],[YMIN,YMAX]])
-
-
-gx = np.linspace(XMIN,XMAX,x_side,endpoint=False) + (XMAX-XMIN)/(2.0*x_side)
-gy = np.linspace(YMIN,YMAX,y_side,endpoint=False) + (YMAX-YMIN)/(2.0*y_side)
+##Getting pixel centres
+gx = np.arange(0.5,ra_axis)
+gy = np.arange(0.5,dec_axis)
+GX,GY = np.meshgrid(gx,gy,indexing='ij')
+GX,GY = GX.flatten(), GY.flatten()
+gy,gx = w_obj.all_pix2world(GY,GX,0)
+gx, gy = gx.reshape(ra_axis,dec_axis), gy.reshape(ra_axis,dec_axis)
 
 ##Getting pixel scales
-d2r = lambda x: x*np.pi/180.0
-gx = np.arange(x_side+1)
-gy = np.arange(y_side+1)
-GX,GY = np.meshgrid(gx,gy,indexing='ij')
-GX,GY = GX.flatten(), GY.flatten()
-gy,gx = w_obj.all_pix2world(GY,GX,0)
-gx, gy = gx.reshape(ra_axis+1,dec_axis+1), gy.reshape(ra_axis+1,dec_axis+1)
-dx = gx[1:x_side+1,:y_side]-gx[:x_side,:y_side]
-dely = gy[1:x_side+1,:y_side]-gy[:x_side,:y_side]
-theta = np.arctan(dely/dx)
-dy = gy[:x_side,1:y_side+1]-gy[:x_side,:y_side]
-angle_part = np.sin(np.pi/2-gy[:x_side,:y_side]*np.pi/180)
-#celestial steradians for all pixels
-da = angle_part*(dx*dy)/(np.cos(theta)**2)
+area_array = get_areas()
 
-##Getting pixel locations
-gx = np.arange(x_side)
-gy = np.arange(y_side)
-GX,GY = np.meshgrid(gx,gy,indexing='ij')
-GX,GY = GX.flatten(), GY.flatten()
-gy,gx = w_obj.all_pix2world(GY,GX,0)
-#gx, gy = gx.reshape(ra_axis,dec_axis), gy.reshape(ra_axis,dec_axis)
-
-plt.plot(gx,gy,'.')
-plt.show()
 Nyso = 70
 cov2 = np.zeros(np.shape(coverage))
 cov2 += coverage == 1
