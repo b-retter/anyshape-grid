@@ -215,10 +215,11 @@ def circle(xp,yp,R,grid=None,relative=False):
         print('world coordinate outside coverage map')
         
     #reduce distance search to more immediate values
-    dists = gcircle((gx,gy),(xp,yp))
-    co_x,co_y = np.where((dists <= R) & (grid == 1))
+    il,ir,jl,jr = angle2box(xp,yp,R)
+    dists = gcircle((gx[il:ir,jl:jr],gy[il:ir,jl:jr]),(xp,yp))
+    co_x,co_y = np.where((dists <= R) & (grid[il:ir,jl:jr] == 1))
     if relative == False:
-        return np.array([co_x,co_y])
+        return np.array([co_x+il,co_y+jl])
     elif relative == True:
         return np.array([co_x,co_y])-np.array([xg,yg]).reshape(2,1)
     
@@ -418,10 +419,11 @@ def ring(xp,yp,R,w,grid=None,relative=False):
         print('world coordinate outside coverage map')
 
     #reduce distance search to more immediate values
-    dists = gcircle((gx,gy),(xp,yp))
-    co_x,co_y = np.where((dists <= Rout) & (dists >= Rin) & (grid == 1))
+    il,ir,jl,jr = angle2box(xp,yp,Rout)
+    dists = gcircle((gx[il:ir,jl:jr],gy[il:ir,jl:jr]),(xp,yp))
+    co_x,co_y = np.where((dists <= Rout) & (dists >= Rin) & (grid[il:ir,jl:jr] == 1))
     if relative == False:
-        return np.array([co_x,co_y])
+        return np.array([co_x+il,co_y+jl])
     elif relative == True:
         return np.array([co_x,co_y])-np.array([xg,yg]).reshape(2,1)
 
