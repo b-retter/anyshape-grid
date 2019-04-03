@@ -283,18 +283,20 @@ def random_ysos(val,mode='binomial',grid=None):
     yso_map = np.zeros(shape)
     yso = [[],[]]
     if mode == 'csr':
-        lmda = val/float((XMAX-XMIN)*(YMAX-YMIN))
-        pixel_area = dx*dy
+        total_area = get_area()
+        lmda = val/total_area
         for pixel in range(n_pixels):
             i,j = inside_pixels[0,pixel], inside_pixels[1,pixel]
-            Nyso = rnd.poisson(lmda*pixel_area)
+            Nyso = rnd.poisson(lmda*area_array[i,j])
             yso_map[i,j] = Nyso
 
             if Nyso > 0:
-                x = (rnd.rand(Nyso)-0.5)*dx+gx[i]
-                y = (rnd.rand(Nyso)-0.5)*dy+gy[j]
-                yso[0].append(x)
-                yso[1].append(y)
+                if inverted:
+                    y,x = w_obj.all_pix2world(rnd.rand(Nyso)+j,rnd.rand(Nyso)+i,0)
+                else:
+                    x,y = w_obj.all_pix2world(rnd.rand(Nyso)+i,rnd.rand(Nyso)+j,0)
+                yso[0].append(x.tolist())
+                yso[1].append(y.tolist())
             
         return np.array(yso), yso_map
     
@@ -303,9 +305,10 @@ def random_ysos(val,mode='binomial',grid=None):
             rand_pixel = rnd.randint(0,n_pixels)
             i,j = inside_pixels[0,rand_pixel], inside_pixels[1,rand_pixel]
             yso_map[i,j] += 1
-            
-            x = (rnd.rand()-0.5)*dx+gx[i]
-            y = (rnd.rand()-0.5)*dy+gy[j]
+            if inverted:
+                y,x = w_obj.all_pix2world(rnd.rand()+j,rnd.rand()+i,0)
+            else:
+                x,y = w_obj.all_pix2world(rnd.rand()+i,rnd.rand()+j,0)
             yso[0].append(x)
             yso[1].append(y)
             
@@ -558,7 +561,7 @@ def get_area(grid = None):
     if grid is None:
         grid = coverage
         
-    return float(np.sum(area_array))
+    return float(np.sum(area_array*grid))
 
 def gcircle(p1,p2):
     """
@@ -634,7 +637,7 @@ else:
     ra_axis = header['NAXIS1']
     dec_axis = header['NAXIS2']
 
-##Getting pixel centres
+##Getting celestial coordinates of pixel centres
 gx = np.arange(0.5,ra_axis)
 gy = np.arange(0.5,dec_axis)
 GX,GY = np.meshgrid(gx,gy,indexing='ij')
@@ -642,20 +645,22 @@ GX,GY = GX.flatten(), GY.flatten()
 gy,gx = w_obj.all_pix2world(GY,GX,0)
 gx, gy = gx.reshape(ra_axis,dec_axis), gy.reshape(ra_axis,dec_axis)
 
-##Getting pixel scales
-area_array = get_area_array()
-total_area = np.sum(area_array)
-Nyso = 70
 cov2 = np.zeros(np.shape(coverage))
 cov2 += coverage == 1
 
 coverage = cov2
+
+##Getting pixel scales
+area_array = get_area_array()
+total_area = np.sum(area_array)
+uniq = get_area()/area_array[0,0]
+
 print(np.shape(coverage))
-yso, yso_map = random_ysos(Nyso,mode='binomial',grid=coverage)
+yso, yso_map = random_ysos(uniq,mode='csr',grid=coverage)
 
 
 
 #X,Y = np.meshgrid(x,y)
-#plt.pcolormesh(X,Y,coverage.T)
-#plt.plot(yso[0,:],yso[1,:],'*')
-#plt.show()
+plt.pcolormesh(gx,gy,coverage)
+plt.plot(yso[0,:],yso[1,:],'*')
+plt.show()
