@@ -160,7 +160,7 @@ def xy2grid(v1,v2,wcs_obj=None):
     else:
         i,j = wcs_obj.all_world2pix(v1,v2,0)
         
-    return np.floor(i),np.floor(j)
+    return int(np.floor(i)),int(np.floor(j))
 
 def ij2xy(i,j,wcs_obj=None):
     """
@@ -214,7 +214,8 @@ def circle(xp,yp,R,grid=None,relative=False):
     if not inside_check(xp,yp):
         print('world coordinate outside coverage map')
         
-    dists = np.abs(gcircle((gx,gy),(xp,yp)))
+    #reduce distance search to more immediate values
+    dists = gcircle((gx,gy),(xp,yp))
     co_x,co_y = np.where((dists <= R) & (grid == 1))
     if relative == False:
         return np.array([co_x,co_y])
@@ -336,7 +337,6 @@ def kfunc(x,y,t,yso_map=None,grid=None,opti=False,diag=False):
     #Generate relative circle coords for approx centre of map
     shape = np.shape(yso_map)
     x_mid,y_mid = ij2xy(shape[0]/2,shape[1]/2)
-    mid_coords = circle(x_mid,y_mid,t,np.ones(shape),relative=True)
     
     for i in range(len(x)):
 
@@ -372,7 +372,6 @@ def Oring(x,y,t,w,yso_map=None,grid=None,opti=False,diag=False):
     #Generate relative circle coords for approx centre of map
     shape = np.shape(yso_map)
     x_mid,y_mid = ij2xy(shape[0]/2,shape[1]/2)
-    mid_coords = ring(x_mid,y_mid,t,w,np.ones(shape),relative=True)
     
     yso_sum = 0
     area = 0
@@ -418,6 +417,7 @@ def ring(xp,yp,R,w,grid=None,relative=False):
     if not inside_check(xp,yp):
         print('world coordinate outside coverage map')
 
+    #reduce distance search to more immediate values
     dists = gcircle((gx,gy),(xp,yp))
     co_x,co_y = np.where((dists <= Rout) & (dists >= Rin) & (grid == 1))
     if relative == False:
@@ -613,6 +613,38 @@ def get_area_array():
     #celestial steradians for all pixels
     return angle_part*(dRA*dDec)/(np.cos(theta)**2)
 
+def angle2box(xp,yp,t):
+    """
+    Calculate a VERY conservative estimate of the grid squares
+    that cover an angular distance t.
+    Returns the i and j values of bottom left and top right
+    corners.
+    """
+    if inverted:
+        j,i = w_obj.all_world2pix(yp,xp,0)
+        
+        ##translate angle t in both ra and dec
+        jl,il = w_obj.all_world2pix(yp-t,xp-t,0)
+        jr,ir = w_obj.all_world2pix(yp+t,xp+t,0)
+        
+    else:
+        i,j = w_obj.all_world2pix(xp,yp,0)
+
+        ##translate angle t in both ra and dec
+        il,jl = w_obj.all_world2pix(xp-t,yp-t,0)
+        ir,jr = w_obj.all_world2pix(xp+t,yp+t,0)
+
+    if jl < 0:
+        jl = 0
+    if il < 0:
+        il = 0
+    if ir > ra_axis:
+        ir = ra_axis
+    if jr > dec_axis:
+        jr = dec_axis
+
+    return int(il),int(ir),int(jl),int(jr)
+
 """
 Extract the relevant data from the fits file. 
 Array size.
@@ -659,14 +691,16 @@ coverage = cov2
 ##Getting pixel scales
 area_array = get_area_array()
 total_area = np.sum(area_array)
-uniq = get_area()/(10*area_array[0,0])
+uniq = get_area()/(10000*area_array[0,0])
 
 print(np.shape(coverage))
 yso, yso_map = random_ysos(uniq,mode='csr',grid=coverage)
 
+t = 0.5
+w = 0.1
+o1, o2 = Oring(yso[0,:],yso[1,:],t,w,yso_map=None,grid=None,opti=False,diag=False)
+print(o2)
 
-
-#X,Y = np.meshgrid(x,y)
-plt.pcolormesh(gx,gy,coverage)
-plt.plot(yso[0,:],yso[1,:],'*')
-plt.show()
+#plt.pcolormesh(gx,gy,coverage)
+#plt.plot(yso[0,:],yso[1,:],'*')
+#plt.show()
