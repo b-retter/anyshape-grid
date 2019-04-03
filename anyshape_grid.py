@@ -160,7 +160,7 @@ def xy2grid(v1,v2,wcs_obj=None):
     else:
         i,j = wcs_obj.all_world2pix(v1,v2,0)
         
-    return i,j
+    return np.floor(i),np.floor(j)
 
 def ij2xy(i,j,wcs_obj=None):
     """
@@ -181,12 +181,6 @@ def delDist2Grid(v2,v1=0,axis=None):
         return int((v2-v1)/float(dx))
     elif axis == 'y':
         return int((v2-v1)/float(dy))
-    
-def delGrid2Dist(i2,i1=0,axis=None):
-    if axis == 'x':
-        return (i2-i1)*dx
-    if axis == 'y':
-        return (i2-i1)*dy
 
 def inside_check(v1,v2,wcs_obj=None):
     """
@@ -332,7 +326,7 @@ def kfunc(x,y,t,yso_map=None,grid=None,opti=False,diag=False):
     #yso will each count themselves once over the course of the 
     #algorithm. This accounts for the self-counting.
     yso_sum = -np.sum(yso_map)
-    area_sum = 0
+    area = 0
 
     #Generate relative circle coords for approx centre of map
     shape = np.shape(yso_map)
@@ -344,13 +338,13 @@ def kfunc(x,y,t,yso_map=None,grid=None,opti=False,diag=False):
         coords = circle(x[i],y[i],t,grid)
                 
         n_coords = np.shape(coords)[1]
-        area_sum += n_coords
         
         for j in range(n_coords):
             yso_sum+=yso_map[coords[0,j],coords[1,j]]
+            area += area_array[coords[0,j],coords[1,j]]
 
-    area = dx*dy*area_sum
-    lmda = np.sum(yso_map)/float(np.sum(grid)*dx*dy)
+    total_area = get_area()
+    lmda = np.sum(yso_map)/total_area
     K = (np.pi*t**2/lmda)*yso_sum/float(area)
     L = np.sqrt(K/np.pi) - t
     if diag == True:
@@ -361,7 +355,7 @@ def kfunc(x,y,t,yso_map=None,grid=None,opti=False,diag=False):
 def Oring(x,y,t,w,yso_map=None,grid=None,opti=False,diag=False):
     """
     Calculates Oring function for points with coords x,y.
-    Most likely x and y are the positions of yso.
+    Most likely x and y are the positions of ysos.
     """
 
     if yso_map is None:
@@ -376,26 +370,25 @@ def Oring(x,y,t,w,yso_map=None,grid=None,opti=False,diag=False):
     mid_coords = ring(x_mid,y_mid,t,w,np.ones(shape),relative=True)
     
     yso_sum = 0
-    area_sum = 0
+    area = 0
     for i in range(len(x)):
         self_count = False
 
         coords = ring(x[i],y[i],t,w,grid)
         n_coords = np.shape(coords)[1]
-        area_sum += n_coords
 
         xg,yg = xy2grid(x[i],y[i])
         for j in range(n_coords):
 
             #Allow o-ring to skip one point within its own grid square.
             if coords[0,j]==xg and coords[1,j]==yg and self_count == False:
-                self_count = True
-                continue
-            
+                yso_sum-=1
+
+            area += area_array[coords[0,j],coords[1,j]]
             yso_sum+=yso_map[coords[0,j],coords[1,j]]
-    
-    area = dx*dy*area_sum
-    lmda = np.sum(yso_map)/float(np.sum(grid)*dx*dy)
+
+    total_area = get_area()
+    lmda = np.sum(yso_map)/total_area
     O = yso_sum/float(area)
     if diag == True:
         return O, O/lmda, yso_sum, float(area)
@@ -433,6 +426,8 @@ def gfunc(x,y,t,yso_map=None,grid=None):
     have a nearest neighbour within distance t.
     Applying the border method of edge correction.
     """
+    print('gfunc no longer functions in this version. Requires rewrite.')
+    return None
     
     if grid is None:
         grid = coverage
@@ -486,6 +481,8 @@ def ffunc(x,y,t,a=None,b=None,yso_map=None,grid=None):
     If not provided a and b will be randomly distributed over the
     map. 
     """
+    print('ffunc no longer functions in this version. Requires rewrite.')
+    return None
     if grid is None:
         grid = coverage
     
@@ -561,7 +558,7 @@ def get_area(grid = None):
     if grid is None:
         grid = coverage
         
-    return float(np.sum(grid)*dx*dy)
+    return float(np.sum(area_array))
 
 def gcircle(p1,p2):
     """
@@ -581,7 +578,7 @@ def gcircle(p1,p2):
     sep = np.arctan(s1/s2)
     return sep*180/np.pi
 
-def get_areas():
+def get_area_array():
     """
     Return the celestial pixel areas for each pixel
     in the FITS file.
@@ -609,7 +606,7 @@ def get_areas():
 
     angle_part = np.sin(np.pi/2-gy[:ra_axis,:dec_axis]*np.pi/180.0)
     #celestial steradians for all pixels
-    return angle_part*(dRa*dDec)/(np.cos(theta)**2)
+    return angle_part*(dRA*dDec)/(np.cos(theta)**2)
 
 """
 Extract the relevant data from the fits file. 
@@ -646,8 +643,8 @@ gy,gx = w_obj.all_pix2world(GY,GX,0)
 gx, gy = gx.reshape(ra_axis,dec_axis), gy.reshape(ra_axis,dec_axis)
 
 ##Getting pixel scales
-area_array = get_areas()
-
+area_array = get_area_array()
+total_area = np.sum(area_array)
 Nyso = 70
 cov2 = np.zeros(np.shape(coverage))
 cov2 += coverage == 1
