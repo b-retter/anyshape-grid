@@ -214,7 +214,7 @@ def circle(xp,yp,R,grid=None,relative=False):
     if not inside_check(xp,yp):
         print('world coordinate outside coverage map')
         
-    dists = np.abs(gcircle((GX,GY),(xp,yp)))
+    dists = np.abs(gcircle((gx,gy),(xp,yp)))
     co_x,co_y = np.where((dists <= R) & (grid == 1))
     if relative == False:
         return np.array([co_x,co_y])
@@ -418,7 +418,7 @@ def ring(xp,yp,R,w,grid=None,relative=False):
     if not inside_check(xp,yp):
         print('world coordinate outside coverage map')
 
-    dists = gcircle((GX,GY),(xp,yp))
+    dists = gcircle((gx,gy),(xp,yp))
     co_x,co_y = np.where((dists <= Rout) & (dists >= Rin) & (grid == 1))
     if relative == False:
         return np.array([co_x,co_y])
@@ -647,6 +647,9 @@ GX,GY = np.meshgrid(gx,gy,indexing='ij')
 GX,GY = GX.flatten(), GY.flatten()
 gy,gx = w_obj.all_pix2world(GY,GX,0)
 gx, gy = gx.reshape(ra_axis,dec_axis), gy.reshape(ra_axis,dec_axis)
+
+##Clear GX and GY from memory
+GX, GY = None, None
 
 cov2 = np.zeros(np.shape(coverage))
 cov2 += coverage == 1
