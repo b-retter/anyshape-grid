@@ -622,6 +622,7 @@ def angle2box(xp,yp,t):
     Returns the i and j values of bottom left and top right
     corners.
     """
+    t=np.sqrt(2)*t
     if inverted:
         j,i = w_obj.all_world2pix(yp,xp,0)
         
@@ -688,54 +689,57 @@ GX, GY = None, None
 cov2 = np.zeros(np.shape(coverage))
 cov2 += coverage == 1
 
-coverage = cov2
+coverage = np.ones(np.shape(coverage))
 
 ##Getting pixel scales
 area_array = get_area_array()
 total_area = np.sum(area_array)
 val = 200
 print(np.shape(coverage))
-yso, yso_map = random_ysos(val,mode='csr',grid=coverage)
+y,x = w_obj.all_pix2world(1500,3200,0)
 
-steps = 20
-r = np.linspace(0.1,2,steps)
-w = 0.3*r
+steps = 5
+r = np.linspace(0.3,1.5,steps)
+w = 0.1
 
 results = np.empty((2,steps))
 for i,t in enumerate(r):
-    o1, o2 = Oring(yso[0,:],yso[1,:],t,w[i],yso_map=None,grid=None,opti=False,diag=False)
-    k1, k2 = kfunc(yso[0,:],yso[1,:],t)
-    results[0,i] = o2
-    results[1,i] = k2
+    ##Oring area
+    Oarea = 0
+
+    coords = ring(x,y,t,w,coverage)
+    n_coords = np.shape(coords)[1]
+    for j in range(n_coords):
+        Oarea += area_array[coords[0,j],coords[1,j]]
+
+    ##K area
+    Karea = 0
+    
+    coords = circle(x,y,t,coverage)
+    n_coords = np.shape(coords)[1]
+    for j in range(n_coords):
+        Karea += area_array[coords[0,j],coords[1,j]]
+        
+    results[0,i] = Oarea
+    results[1,i] = Karea
 
 
 fpath = '/Users/bretter/Documents/StarFormation/Meetings/04-04-2019/'
-
-plt.pcolormesh(gx,gy,coverage)
-plt.plot(yso[0,:],yso[1,:],'*')
-plt.xlabel('RA')
-plt.ylabel('Dec')
-plt.title('200 YSOs randomly distibuted in coverage map')
-
-fname = 'yso_coverage.png'
-plt.savefig(fpath+fname)
-
-plt.plot(r,results[0,:])
+plt.figure()
+plt.plot(r,results[0,:]-2*np.pi*r*w)
 plt.xlabel('r (angle)')
-plt.ylabel(r'$O/\lambda$')
-plt.title('O-ring for YSOs randomly distibuted in coverage map')
+plt.ylabel('Area diff')
+plt.title('Empirical - Analytical Ring area vs R')
 
-fname = 'oring.png'
+fname = 'ring_area.png'
 plt.savefig(fpath+fname)
 
-plt.plot(r,results[1,:])
+plt.figure()
+plt.plot(r,results[1,:]-np.pi*r**2)
 plt.xlabel('r (angle)')
-plt.ylabel(r'$L$')
-plt.title("Ripley's K for YSOs randomly distibuted in coverage map")
-
-fname = 'oring.png'
+plt.ylabel('Area diff')
+plt.title("Empirical - Analytical Circle area vs R")
+fname = 'circle_area.png'
 plt.savefig(fpath+fname)
 
-fname='results'
-np.save(fpath+fname)
-
+plt.show()
