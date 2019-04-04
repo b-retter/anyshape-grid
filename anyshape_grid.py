@@ -9,7 +9,7 @@ from astropy.io import fits
 from astropy import wcs
 
 #/Users/bretter/Documents/StarFormation/RandomDistribution/spatialStats/Functions
-sys.path.append('../allstats_examples')
+sys.path.append('/Users/bretter/Documents/StarFormation/RandomDistribution/spatialStats/Functions')
 import allstats as alls
 from timeit import default_timer as timer
 
@@ -656,8 +656,8 @@ Array of grid centre coordinates.
 Coverage map.
 """
 
-#fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
-fits_path = '../SFR_data'
+fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
+#fits_path = '../SFR_data'
 fits_name = 'SERAQU_IRAC1234M1_cov_sm.fits'
 coverage,header = fits.getdata(os.path.join(fits_path,fits_name), header=True)
 w_obj = wcs.WCS(header)
@@ -693,16 +693,49 @@ coverage = cov2
 ##Getting pixel scales
 area_array = get_area_array()
 total_area = np.sum(area_array)
-uniq = get_area()/(10000*area_array[0,0])
-
+val = 200
 print(np.shape(coverage))
-yso, yso_map = random_ysos(uniq,mode='csr',grid=coverage)
+yso, yso_map = random_ysos(val,mode='csr',grid=coverage)
 
-t = 0.5
-w = 0.1
-o1, o2 = Oring(yso[0,:],yso[1,:],t,w,yso_map=None,grid=None,opti=False,diag=False)
-print(o2)
+steps = 20
+r = np.linspace(0.1,2,steps)
+w = 0.3*r
 
-#plt.pcolormesh(gx,gy,coverage)
-#plt.plot(yso[0,:],yso[1,:],'*')
-#plt.show()
+results = np.empty((2,steps))
+for i,t in enumerate(r):
+    o1, o2 = Oring(yso[0,:],yso[1,:],t,w[i],yso_map=None,grid=None,opti=False,diag=False)
+    k1, k2 = kfunc(yso[0,:],yso[1,:],t)
+    results[0,i] = o2
+    results[1,i] = k2
+
+
+fpath = '/Users/bretter/Documents/StarFormation/Meetings/04-04-2019/'
+
+plt.pcolormesh(gx,gy,coverage)
+plt.plot(yso[0,:],yso[1,:],'*')
+plt.xlabel('RA')
+plt.ylabel('Dec')
+plt.title('200 YSOs randomly distibuted in coverage map')
+
+fname = 'yso_coverage.png'
+plt.savefig(fpath+fname)
+
+plt.plot(r,results[0,:])
+plt.xlabel('r (angle)')
+plt.ylabel(r'$O/\lambda$')
+plt.title('O-ring for YSOs randomly distibuted in coverage map')
+
+fname = 'oring.png'
+plt.savefig(fpath+fname)
+
+plt.plot(r,results[1,:])
+plt.xlabel('r (angle)')
+plt.ylabel(r'$L$')
+plt.title("Ripley's K for YSOs randomly distibuted in coverage map")
+
+fname = 'oring.png'
+plt.savefig(fpath+fname)
+
+fname='results'
+np.save(fpath+fname)
+
