@@ -622,6 +622,7 @@ def angle2box(xp,yp,t):
     Returns the i and j values of bottom left and top right
     corners.
     """
+    t = np.sqrt(2)*t
     if inverted:
         j,i = w_obj.all_world2pix(yp,xp,0)
         
