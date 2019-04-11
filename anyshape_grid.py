@@ -160,7 +160,7 @@ def xy2grid(v1,v2,wcs_obj=None):
     else:
         i,j = wcs_obj.all_world2pix(v1,v2,0)
         
-    return int(np.floor(i)),int(np.floor(j))
+    return int(np.round(i)),int(np.round(j))
 
 def ij2xy(i,j,wcs_obj=None):
     """
@@ -686,8 +686,8 @@ else:
     dec_axis = header['NAXIS2']
 
 ##Getting celestial coordinates of pixel centres
-gx = np.arange(0.5,ra_axis)
-gy = np.arange(0.5,dec_axis)
+gx = np.arange(0,ra_axis)
+gy = np.arange(0,dec_axis)
 GX,GY = np.meshgrid(gx,gy,indexing='ij')
 GX,GY = GX.flatten(), GY.flatten()
 gy,gx = w_obj.all_pix2world(GY,GX,0)
