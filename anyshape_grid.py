@@ -585,35 +585,45 @@ def gcircle(p1,p2):
     sep = np.arctan(s1/s2)
     return sep*180/np.pi
 
-def get_area_array():
+def get_area_array(tan=True):
     """
     Return the celestial pixel areas for each pixel
     in the FITS file.
-    Assumes pixels are small and can be approximated 
+    If tan projection, calculates celestial area by calculating
+    great circle angle to each pixel and multiplying reference 
+    pixel angle by plate scale cos**3(theta). See wikipedia
+    gnomonic projection. 
+
+    Else, assumes pixels are small and can be approximated 
     by rectangles rotated with respect to lines of const ra.
     """
-
-    #Find RA and Dec at each grid coordinate
-    gx = np.arange(ra_axis+1)
-    gy = np.arange(dec_axis+1)
-    GX,GY = np.meshgrid(gx,gy,indexing='ij')
-    GX,GY = GX.flatten(), GY.flatten()
-    gy,gx = w_obj.all_pix2world(GY,GX,0)
-    gx, gy = gx.reshape(ra_axis+1,dec_axis+1), gy.reshape(ra_axis+1,dec_axis+1)
-
-    #Find dRA_ij = RA_{i+1},j - RA_ij and likewise for dec
-    dRA = gx[1:ra_axis+1,:dec_axis]-gx[:ra_axis,:dec_axis]
-    dDec = gy[:ra_axis,1:dec_axis+1]-gy[:ra_axis,:dec_axis]
-
-    #Due to rotation a step in grid changes both ra and dec.
-    #Calculate angle between lines of constant Ra and the
-    #grid at constant i.
-    dely = gy[1:ra_axis+1,:dec_axis]-gy[:ra_axis,:dec_axis]
-    theta = np.arctan(dely/dRA)
-
-    angle_part = np.sin(np.pi/2-gy[:ra_axis,:dec_axis]*np.pi/180.0)
-    #celestial steradians for all pixels
-    return angle_part*(dRA*dDec)/(np.cos(theta)**2)
+    if tan:
+        #If tan projection use da_sphere = cos**3(theta)*da_plane
+        angles = gcircle((gx,gy),(ra_ref,dec_ref))
+        ref_area = wcs.utils.proj_plane_pixel_area(w_obj)
+        return np.cos(d2r(angles))**3*ref_area
+    else:
+        #Find RA and Dec at each grid coordinate
+        gx = np.arange(ra_axis+1)
+        gy = np.arange(dec_axis+1)
+        GX,GY = np.meshgrid(gx,gy,indexing='ij')
+        GX,GY = GX.flatten(), GY.flatten()
+        gy,gx = w_obj.all_pix2world(GY,GX,0)
+        gx, gy = gx.reshape(ra_axis+1,dec_axis+1), gy.reshape(ra_axis+1,dec_axis+1)
+        
+        #Find dRA_ij = RA_{i+1},j - RA_ij and likewise for dec
+        dRA = gx[1:ra_axis+1,:dec_axis]-gx[:ra_axis,:dec_axis]
+        dDec = gy[:ra_axis,1:dec_axis+1]-gy[:ra_axis,:dec_axis]
+        
+        #Due to rotation a step in grid changes both ra and dec.
+        #Calculate angle between lines of constant Ra and the
+        #grid at constant i.
+        dely = gy[1:ra_axis+1,:dec_axis]-gy[:ra_axis,:dec_axis]
+        theta = np.arctan(dely/dRA)
+        
+        angle_part = np.sin(np.pi/2-gy[:ra_axis,:dec_axis]*np.pi/180.0)
+        #celestial steradians for all pixels
+        return angle_part*(dRA*dDec)/(np.cos(theta)**2)
 
 def angle2box(xp,yp,t):
     """
