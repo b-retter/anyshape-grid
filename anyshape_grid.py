@@ -696,9 +696,18 @@ area_array = get_area_array()
 total_area = np.sum(area_array)
 val = 200
 print(np.shape(coverage))
+#alternative pixel scales
+xref,yref = 275.812423, -3.091872
+angles = gcircle((gx,gy),(xref,yref))
+ref_area = wcs.utils.proj_plane_pixel_area(w_obj)
+#area_array = np.cos(d2r(angles))**3*ref_area
+
 y,x = w_obj.all_pix2world(1500,3200,0)
 
-steps = 5
+d2r = lambda x: x*np.pi/180.0
+r2d = lambda x: x*180.0/np.pi
+R = 180/np.pi
+steps = 50
 r = np.linspace(0.3,1.5,steps)
 w = 0.1
 
@@ -724,9 +733,10 @@ for i,t in enumerate(r):
     results[1,i] = Karea
 
 
-fpath = '/Users/bretter/Documents/StarFormation/Meetings/04-04-2019/'
+fpath = '/Users/bretter/Documents/StarFormation/Meetings/11-04-19/'
 plt.figure()
-plt.plot(r,results[0,:]-2*np.pi*r*w)
+plt.plot(r,results[0,:]-2*np.pi*R**2*d2r(r)*d2r(w))
+plt.plot(r,2*np.pi*R**2*(np.sin(d2r(r))-d2r(r))*d2r(w))
 plt.xlabel('r (angle)')
 plt.ylabel('Area diff')
 plt.title('Empirical - Analytical Ring area vs R')
@@ -735,7 +745,8 @@ fname = 'ring_area.png'
 plt.savefig(fpath+fname)
 
 plt.figure()
-plt.plot(r,results[1,:]-np.pi*r**2)
+plt.plot(r,results[1,:]-np.pi*(R*d2r(r))**2)
+plt.plot(r,np.pi*(R**2)*(2-2*np.cos(d2r(r))-d2r(r)**2))
 plt.xlabel('r (angle)')
 plt.ylabel('Area diff')
 plt.title("Empirical - Analytical Circle area vs R")
