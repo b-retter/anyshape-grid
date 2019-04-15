@@ -599,29 +599,37 @@ def get_area_array(tan=True):
     """
     if tan:
         #If tan projection use da_sphere = cos**3(theta)*da_plane
+        if inverted:
+            ra_ref = header['CRVAL2']
+            dec_ref = header['CRVAL1']
+        else:
+            dec_ref = header['CRVAL2']
+            ra_ref = header['CRVAL1']
+
+        d2r = lambda x: x*np.pi/180.0
         angles = gcircle((gx,gy),(ra_ref,dec_ref))
         ref_area = wcs.utils.proj_plane_pixel_area(w_obj)
         return np.cos(d2r(angles))**3*ref_area
     else:
         #Find RA and Dec at each grid coordinate
-        gx = np.arange(ra_axis+1)
-        gy = np.arange(dec_axis+1)
-        GX,GY = np.meshgrid(gx,gy,indexing='ij')
+        grx = np.arange(ra_axis+1)
+        gry = np.arange(dec_axis+1)
+        GX,GY = np.meshgrid(grx,gry,indexing='ij')
         GX,GY = GX.flatten(), GY.flatten()
-        gy,gx = w_obj.all_pix2world(GY,GX,0)
-        gx, gy = gx.reshape(ra_axis+1,dec_axis+1), gy.reshape(ra_axis+1,dec_axis+1)
+        gry,grx = w_obj.all_pix2world(GY,GX,0)
+        grx, gry = grx.reshape(ra_axis+1,dec_axis+1), gry.reshape(ra_axis+1,dec_axis+1)
         
         #Find dRA_ij = RA_{i+1},j - RA_ij and likewise for dec
-        dRA = gx[1:ra_axis+1,:dec_axis]-gx[:ra_axis,:dec_axis]
-        dDec = gy[:ra_axis,1:dec_axis+1]-gy[:ra_axis,:dec_axis]
+        dRA = grx[1:ra_axis+1,:dec_axis]-grx[:ra_axis,:dec_axis]
+        dDec = gry[:ra_axis,1:dec_axis+1]-gry[:ra_axis,:dec_axis]
         
         #Due to rotation a step in grid changes both ra and dec.
         #Calculate angle between lines of constant Ra and the
         #grid at constant i.
-        dely = gy[1:ra_axis+1,:dec_axis]-gy[:ra_axis,:dec_axis]
+        dely = gry[1:ra_axis+1,:dec_axis]-gry[:ra_axis,:dec_axis]
         theta = np.arctan(dely/dRA)
         
-        angle_part = np.sin(np.pi/2-gy[:ra_axis,:dec_axis]*np.pi/180.0)
+        angle_part = np.sin(np.pi/2-gry[:ra_axis,:dec_axis]*np.pi/180.0)
         #celestial steradians for all pixels
         return angle_part*(dRA*dDec)/(np.cos(theta)**2)
 
@@ -685,9 +693,23 @@ else:
     ra_axis = header['NAXIS1']
     dec_axis = header['NAXIS2']
 
+
+##Extracting sections of map
+bl_ra,bl_dec = 275,-4.5
+tr_ra, tr_dec = 278.5,-1
+dec_box,ra_box = w_obj.all_world2pix((bl_dec,tr_dec),(bl_ra,tr_ra),0)
+dec_box = np.round(dec_box)
+ra_box = np.round(ra_box)
+
+#Remove non-binary values from coverage map
+cov2 = np.zeros(np.shape(coverage))
+cov2 += coverage == 1
+
+coverage = cov2[int(ra_box[0]):int(ra_box[1]),int(dec_box[0]):int(dec_box[1])]
+ra_axis,dec_axis = np.shape(coverage)
 ##Getting celestial coordinates of pixel centres
-gx = np.arange(0,ra_axis)
-gy = np.arange(0,dec_axis)
+gx = np.arange(ra_box[0],ra_box[1])
+gy = np.arange(dec_box[0],dec_box[1])
 GX,GY = np.meshgrid(gx,gy,indexing='ij')
 GX,GY = GX.flatten(), GY.flatten()
 gy,gx = w_obj.all_pix2world(GY,GX,0)
@@ -696,57 +718,10 @@ gx, gy = gx.reshape(ra_axis,dec_axis), gy.reshape(ra_axis,dec_axis)
 ##Clear GX and GY from memory
 GX, GY = None, None
 
-cov2 = np.zeros(np.shape(coverage))
-cov2 += coverage == 1
-
-coverage = cov2
-
 ##Getting pixel scales
 area_array = get_area_array()
 total_area = np.sum(area_array)
-val = 200
-print(np.shape(coverage))
-yso, yso_map = random_ysos(val,mode='csr',grid=coverage)
-
-steps = 20
-r = np.linspace(0.1,2,steps)
-w = 0.3*r
-
-results = np.empty((2,steps))
-for i,t in enumerate(r):
-    o1, o2 = Oring(yso[0,:],yso[1,:],t,w[i],yso_map=None,grid=None,opti=False,diag=False)
-    k1, k2 = kfunc(yso[0,:],yso[1,:],t)
-    results[0,i] = o2
-    results[1,i] = k2
-
-
-fpath = '/Users/bretter/Documents/StarFormation/Meetings/04-04-2019/'
 
 plt.pcolormesh(gx,gy,coverage)
-plt.plot(yso[0,:],yso[1,:],'*')
-plt.xlabel('RA')
-plt.ylabel('Dec')
-plt.title('200 YSOs randomly distibuted in coverage map')
-
-fname = 'yso_coverage.png'
-plt.savefig(fpath+fname)
-
-plt.plot(r,results[0,:])
-plt.xlabel('r (angle)')
-plt.ylabel(r'$O/\lambda$')
-plt.title('O-ring for YSOs randomly distibuted in coverage map')
-
-fname = 'oring.png'
-plt.savefig(fpath+fname)
-
-plt.plot(r,results[1,:])
-plt.xlabel('r (angle)')
-plt.ylabel(r'$L$')
-plt.title("Ripley's K for YSOs randomly distibuted in coverage map")
-
-fname = 'oring.png'
-plt.savefig(fpath+fname)
-
-fname='results'
-np.save(fpath+fname)
+plt.show()
 
