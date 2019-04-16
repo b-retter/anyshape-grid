@@ -703,11 +703,15 @@ dec_box,ra_box = w_obj.all_world2pix((bl_dec,tr_dec),(bl_ra,tr_ra),0)
 dec_box = np.round(dec_box)
 ra_box = np.round(ra_box)
 
+dec_box = (0,dec_axis)
+ra_box = (0,ra_axis)
+
 coverage = coverage[int(ra_box[0]):int(ra_box[1]),int(dec_box[0]):int(dec_box[1])]
 
 #Remove non-binary values from coverage map
-cov2 = np.zeros(np.shape(coverage))
-cov2 += coverage == 1
+#cov2 = np.zeros(np.shape(coverage))
+cov2 = np.ones(np.shape(coverage))
+#cov2 += coverage == 1
 
 coverage = cov2.astype(bool)
 cov2 = None
@@ -732,6 +736,7 @@ total_area = np.sum(area_array)
 val = 200
 print(np.shape(coverage))
 #alternative pixel scales
+d2r = lambda x: x*np.pi/180.0
 xref,yref = 275.812423, -3.091872
 angles = gcircle((gx,gy),(xref,yref))
 ref_area = wcs.utils.proj_plane_pixel_area(w_obj)
@@ -739,7 +744,7 @@ area_array = np.cos(d2r(angles))**3*ref_area
 
 y,x = w_obj.all_pix2world(1500,3200,0)
 
-d2r = lambda x: x*np.pi/180.0
+
 r2d = lambda x: x*180.0/np.pi
 R = 180/np.pi
 steps = 50
@@ -770,22 +775,18 @@ for i,t in enumerate(r):
 
 fpath = '/Users/bretter/Documents/StarFormation/Meetings/11-04-19/'
 plt.figure()
-plt.plot(r,results[0,:]-2*np.pi*R**2*d2r(r)*d2r(w))
-plt.plot(r,2*np.pi*R**2*(np.sin(d2r(r))-d2r(r))*d2r(w))
+plt.plot(r,results[0,:]-2*np.pi*R**2*d2r(r)*d2r(w),'b')
+plt.plot(r,2*np.pi*R**2*(np.sin(d2r(r))-d2r(r))*d2r(w),'r')
 plt.xlabel('r (angle)')
 plt.ylabel('Area diff')
 plt.title('Empirical - Analytical Ring area vs R')
 
-fname = 'ring_area.png'
-plt.savefig(fpath+fname)
 
 plt.figure()
-plt.plot(r,results[1,:]-np.pi*(R*d2r(r))**2)
-plt.plot(r,np.pi*(R**2)*(2-2*np.cos(d2r(r))-d2r(r)**2))
+plt.plot(r,results[1,:]-np.pi*(R*d2r(r))**2,'b')
+plt.plot(r,np.pi*(R**2)*(2-2*np.cos(d2r(r))-d2r(r)**2),'r')
 plt.xlabel('r (angle)')
 plt.ylabel('Area diff')
 plt.title("Empirical - Analytical Circle area vs R")
-fname = 'circle_area.png'
-plt.savefig(fpath+fname)
 
 plt.show()
