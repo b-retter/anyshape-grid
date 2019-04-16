@@ -607,6 +607,7 @@ def get_area_array(tan=True):
             ra_ref = header['CRVAL1']
 
         d2r = lambda x: x*np.pi/180.0
+        
         angles = gcircle((gx,gy),(ra_ref,dec_ref))
         ref_area = wcs.utils.proj_plane_pixel_area(w_obj)
         return np.cos(d2r(angles))**3*ref_area
@@ -687,12 +688,13 @@ if 'DEC' in header['CTYPE1']:
     inverted = True
     dec_axis = header['NAXIS1']
     ra_axis = header['NAXIS2']
+    dec_ref = header['CRVAL1']
+    ra_ref = header['CRVAL2']
 else:
     inverted = False
     coverage = coverage.T
     ra_axis = header['NAXIS1']
     dec_axis = header['NAXIS2']
-
 
 ##Extracting sections of map
 bl_ra,bl_dec = 275,-4.5
@@ -727,7 +729,63 @@ GX, GY = None, None
 ##Getting pixel scales
 area_array = get_area_array()
 total_area = np.sum(area_array)
+val = 200
+print(np.shape(coverage))
+#alternative pixel scales
+xref,yref = 275.812423, -3.091872
+angles = gcircle((gx,gy),(xref,yref))
+ref_area = wcs.utils.proj_plane_pixel_area(w_obj)
+area_array = np.cos(d2r(angles))**3*ref_area
 
-plt.pcolormesh(gx,gy,coverage)
+y,x = w_obj.all_pix2world(1500,3200,0)
+
+d2r = lambda x: x*np.pi/180.0
+r2d = lambda x: x*180.0/np.pi
+R = 180/np.pi
+steps = 50
+r = np.linspace(0.3,1.5,steps)
+w = 0.1
+
+results = np.empty((2,steps))
+for i,t in enumerate(r):
+    ##Oring area
+    Oarea = 0
+
+    coords = ring(x,y,t,w,coverage)
+    n_coords = np.shape(coords)[1]
+    for j in range(n_coords):
+        Oarea += area_array[coords[0,j],coords[1,j]]
+
+    ##K area
+    Karea = 0
+    
+    coords = circle(x,y,t,coverage)
+    n_coords = np.shape(coords)[1]
+    for j in range(n_coords):
+        Karea += area_array[coords[0,j],coords[1,j]]
+        
+    results[0,i] = Oarea
+    results[1,i] = Karea
+
+
+fpath = '/Users/bretter/Documents/StarFormation/Meetings/11-04-19/'
+plt.figure()
+plt.plot(r,results[0,:]-2*np.pi*R**2*d2r(r)*d2r(w))
+plt.plot(r,2*np.pi*R**2*(np.sin(d2r(r))-d2r(r))*d2r(w))
+plt.xlabel('r (angle)')
+plt.ylabel('Area diff')
+plt.title('Empirical - Analytical Ring area vs R')
+
+fname = 'ring_area.png'
+plt.savefig(fpath+fname)
+
+plt.figure()
+plt.plot(r,results[1,:]-np.pi*(R*d2r(r))**2)
+plt.plot(r,np.pi*(R**2)*(2-2*np.cos(d2r(r))-d2r(r)**2))
+plt.xlabel('r (angle)')
+plt.ylabel('Area diff')
+plt.title("Empirical - Analytical Circle area vs R")
+fname = 'circle_area.png'
+plt.savefig(fpath+fname)
+
 plt.show()
-
