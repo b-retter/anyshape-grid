@@ -3,6 +3,7 @@
 import numpy as np
 import numpy.random as rnd
 import matplotlib.pyplot as plt
+import multiprocessing as mp
 import sys
 import os
 from astropy.io import fits
@@ -313,10 +314,10 @@ def random_ysos(val,mode='binomial',grid=None):
                 y,x = w_obj.all_pix2world(rnd.rand()+j,rnd.rand()+i,0)
             else:
                 x,y = w_obj.all_pix2world(rnd.rand()+i,rnd.rand()+j,0)
-            yso[0].append(x)
-            yso[1].append(y)
+            yso_x = np.append(yso_x,x)
+            yso_y = np.append(yso_y,y)
             
-        return np.array(yso), yso_map
+        return np.vstack([yso_x,yso_y]), yso_map
 
 def kfunc(x,y,t,yso_map=None,grid=None,opti=False,diag=False):
     """
@@ -338,7 +339,7 @@ def kfunc(x,y,t,yso_map=None,grid=None,opti=False,diag=False):
     #Generate relative circle coords for approx centre of map
     shape = np.shape(yso_map)
     x_mid,y_mid = ij2xy(shape[0]/2,shape[1]/2)
-    
+    print(len(x))
     for i in range(len(x)):
 
         coords = circle(x[i],y[i],t,grid)
@@ -347,6 +348,7 @@ def kfunc(x,y,t,yso_map=None,grid=None,opti=False,diag=False):
         
         for j in range(n_coords):
             yso_sum+=yso_map[coords[0,j],coords[1,j]]
+            print(area_array[coords[0,j],coords[1,j]])
             area += area_array[coords[0,j],coords[1,j]]
 
     total_area = get_area()
@@ -358,6 +360,29 @@ def kfunc(x,y,t,yso_map=None,grid=None,opti=False,diag=False):
     else:
         return K, L
 
+def one_oring(x1,y1,t,w,grid):
+    """
+    Returns the number of ysos and area around a given yso
+    at position x1,y1.
+    """
+    self_count = False
+
+    coords = ring(x1,y1,t,w,grid)
+    n_coords = np.shape(coords)[1]
+
+    xg,yg = xy2grid(x1,y1)
+    area = 0
+    yso_sum = 0
+    for j in range(n_coords):
+
+        #Allow o-ring to skip one point within its own grid square.
+        if coords[0,j]==xg and coords[1,j]==yg and self_count == False:
+            yso_sum-=1
+
+        area += area_array[coords[0,j],coords[1,j]]
+        yso_sum += yso_map[coords[0,j],coords[1,j]]
+    return np.array([area,yso_sum])
+    
 def Oring(x,y,t,w,yso_map=None,grid=None,opti=False,diag=False):
     """
     Calculates Oring function for points with coords x,y.
@@ -370,27 +395,24 @@ def Oring(x,y,t,w,yso_map=None,grid=None,opti=False,diag=False):
     if grid is None:
         grid = coverage
 
-    #Generate relative circle coords for approx centre of map
-    shape = np.shape(yso_map)
-    x_mid,y_mid = ij2xy(shape[0]/2,shape[1]/2)
+    ##Initialise pool of workers
+    pool = mp.Pool(noProcesses)
     
-    yso_sum = 0
-    area = 0
+    ##Perform one_oring for each yso using workers
+    results = []
     for i in range(len(x)):
-        self_count = False
+        results.append(pool.apply_async(one_oring,(x[i],y[i],t,w,grid)))
 
-        coords = ring(x[i],y[i],t,w,grid)
-        n_coords = np.shape(coords)[1]
+    #Close down workers to finish calculating results
+    pool.close()
+    pool.join()
 
-        xg,yg = xy2grid(x[i],y[i])
-        for j in range(n_coords):
-
-            #Allow o-ring to skip one point within its own grid square.
-            if coords[0,j]==xg and coords[1,j]==yg and self_count == False:
-                yso_sum-=1
-
-            area += area_array[coords[0,j],coords[1,j]]
-            yso_sum+=yso_map[coords[0,j],coords[1,j]]
+    #collate results
+    finished_results = np.empty([len(x),2])
+    for i in range(len(x)):
+        finished_results[i,:] = results[i].get()
+    area = np.float(np.sum(finished_results[:,0]))
+    yso_sum = np.sum(finished_results[:,1])
 
     total_area = get_area()
     lmda = np.sum(yso_map)/total_area
@@ -585,7 +607,7 @@ def gcircle(p1,p2):
     sep = np.arctan(s1/s2)
     return sep*180/np.pi
 
-def get_area_array(tan=True):
+def get_area_array(tan=True,grid=None):
     """
     Return the celestial pixel areas for each pixel
     in the FITS file.
@@ -597,6 +619,10 @@ def get_area_array(tan=True):
     Else, assumes pixels are small and can be approximated 
     by rectangles rotated with respect to lines of const ra.
     """
+
+    if grid is None:
+        grid = coverage
+        
     if tan:
         #If tan projection use da_sphere = cos**3(theta)*da_plane
         if inverted:
@@ -610,7 +636,7 @@ def get_area_array(tan=True):
         
         angles = gcircle((gx,gy),(ra_ref,dec_ref))
         ref_area = wcs.utils.proj_plane_pixel_area(w_obj)
-        return np.cos(d2r(angles))**3*ref_area
+        return np.cos(d2r(angles))**3*ref_area*coverage
     else:
         #Find RA and Dec at each grid coordinate
         grx = np.arange(ra_axis+1)
@@ -667,6 +693,12 @@ def angle2box(xp,yp,t):
 
     return int(il),int(ir),int(jl),int(jr)
 
+def collate(results):
+    array = np.empty([4,LOOPS,len(r)])
+    for i in range(LOOPS):
+        array[:,i,:] = np.array(results[i].get())
+    return array
+
 """
 Extract the relevant data from the fits file. 
 Array size.
@@ -703,15 +735,12 @@ dec_box,ra_box = w_obj.all_world2pix((bl_dec,tr_dec),(bl_ra,tr_ra),0)
 dec_box = np.round(dec_box)
 ra_box = np.round(ra_box)
 
-dec_box = (0,dec_axis)
-ra_box = (0,ra_axis)
-
 coverage = coverage[int(ra_box[0]):int(ra_box[1]),int(dec_box[0]):int(dec_box[1])]
 
 #Remove non-binary values from coverage map
-#cov2 = np.zeros(np.shape(coverage))
-cov2 = np.ones(np.shape(coverage))
-#cov2 += coverage == 1
+cov2 = np.zeros(np.shape(coverage))
+#cov2 = np.ones(np.shape(coverage))
+cov2 += coverage == 1
 
 coverage = cov2.astype(bool)
 cov2 = None
@@ -733,60 +762,39 @@ GX, GY = None, None
 ##Getting pixel scales
 area_array = get_area_array()
 total_area = np.sum(area_array)
-val = 200
+
+val = 50
+yso,yso_map = random_ysos(val,mode='binomial',grid=coverage)
 print(np.shape(coverage))
-#alternative pixel scales
-d2r = lambda x: x*np.pi/180.0
-xref,yref = 275.812423, -3.091872
-angles = gcircle((gx,gy),(xref,yref))
-ref_area = wcs.utils.proj_plane_pixel_area(w_obj)
-area_array = np.cos(d2r(angles))**3*ref_area
 
-y,x = w_obj.all_pix2world(1500,3200,0)
+##Decide number of processes
+noProcesses = 4
 
-
-r2d = lambda x: x*180.0/np.pi
-R = 180/np.pi
-steps = 50
+steps = 5
 r = np.linspace(0.3,1.5,steps)
 w = 0.1
 
 results = np.empty((2,steps))
 for i,t in enumerate(r):
-    ##Oring area
-    Oarea = 0
-
-    coords = ring(x,y,t,w,coverage)
-    n_coords = np.shape(coords)[1]
-    for j in range(n_coords):
-        Oarea += area_array[coords[0,j],coords[1,j]]
-
-    ##K area
-    Karea = 0
+    ##Oring
+    o, oo = Oring(yso[0,:],yso[1,:],t,w)
+    k,kk = kfunc(yso[0,:],yso[1,:],t)
     
-    coords = circle(x,y,t,coverage)
-    n_coords = np.shape(coords)[1]
-    for j in range(n_coords):
-        Karea += area_array[coords[0,j],coords[1,j]]
-        
-    results[0,i] = Oarea
-    results[1,i] = Karea
-
-
-fpath = '/Users/bretter/Documents/StarFormation/Meetings/11-04-19/'
-plt.figure()
-plt.plot(r,results[0,:]-2*np.pi*R**2*d2r(r)*d2r(w),'b')
-plt.plot(r,2*np.pi*R**2*(np.sin(d2r(r))-d2r(r))*d2r(w),'r')
-plt.xlabel('r (angle)')
-plt.ylabel('Area diff')
-plt.title('Empirical - Analytical Ring area vs R')
+    results[0,i] = oo
+    results[1,i] = kk
 
 
 plt.figure()
-plt.plot(r,results[1,:]-np.pi*(R*d2r(r))**2,'b')
-plt.plot(r,np.pi*(R**2)*(2-2*np.cos(d2r(r))-d2r(r)**2),'r')
+plt.plot(r,results[0,:])
+plt.xlabel('r')
+plt.ylabel('Oring')
+plt.title('Oring')
+
+
+plt.figure()
+plt.plot(r,results[1,:])
 plt.xlabel('r (angle)')
-plt.ylabel('Area diff')
-plt.title("Empirical - Analytical Circle area vs R")
+plt.ylabel('L')
+plt.title("L")
 
 plt.show()
