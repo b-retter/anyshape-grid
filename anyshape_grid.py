@@ -701,13 +701,19 @@ dec_box,ra_box = w_obj.all_world2pix((bl_dec,tr_dec),(bl_ra,tr_ra),0)
 dec_box = np.round(dec_box)
 ra_box = np.round(ra_box)
 
+coverage = coverage[int(ra_box[0]):int(ra_box[1]),int(dec_box[0]):int(dec_box[1])]
+
 #Remove non-binary values from coverage map
 cov2 = np.zeros(np.shape(coverage))
 cov2 += coverage == 1
 
-coverage = cov2[int(ra_box[0]):int(ra_box[1]),int(dec_box[0]):int(dec_box[1])]
+coverage = cov2.astype(bool)
+cov2 = None
+
 ra_axis,dec_axis = np.shape(coverage)
+
 ##Getting celestial coordinates of pixel centres
+#
 gx = np.arange(ra_box[0],ra_box[1])
 gy = np.arange(dec_box[0],dec_box[1])
 GX,GY = np.meshgrid(gx,gy,indexing='ij')
