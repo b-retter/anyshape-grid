@@ -378,29 +378,6 @@ def kfunc(x,y,t,yso_map=None,grid=None,opti=False,diag=False):
     else:
         return K, L
 
-def one_oring(x1,y1,t,w,grid):
-    """
-    Returns the number of ysos and area around a given yso
-    at position x1,y1.
-    """
-    self_count = False
-
-    coords = ring(x1,y1,t,w,grid)
-    n_coords = np.shape(coords)[1]
-
-    xg,yg = xy2grid(x1,y1)
-    area = 0
-    yso_sum = 0
-    for j in range(n_coords):
-
-        #Allow o-ring to skip one point within its own grid square.
-        if coords[0,j]==xg and coords[1,j]==yg and self_count == False:
-            yso_sum-=1
-
-        area += area_array[coords[0,j],coords[1,j]]
-        yso_sum += yso_map[coords[0,j],coords[1,j]]
-    return np.array([area,yso_sum])
-    
 def Oring(x,y,t,w,yso_map=None,grid=None,opti=False,diag=False):
     """
     Calculates Oring function for points with coords x,y.
@@ -408,29 +385,32 @@ def Oring(x,y,t,w,yso_map=None,grid=None,opti=False,diag=False):
     """
 
     if yso_map is None:
-        yso_map = yso_to_grid(np.array([x,y]),grid=grid)
+        yso_map = yso_to_grid(np.array([x,y]),grid)
         
     if grid is None:
         grid = coverage
 
-    ##Initialise pool of workers
-    pool = mp.Pool(noProcesses)
+    #Generate relative circle coords for approx centre of map
+    shape = np.shape(yso_map)
+    x_mid,y_mid = ij2xy(shape[0]/2,shape[1]/2)
     
-    ##Perform one_oring for each yso using workers
-    results = []
+    yso_sum = 0
+    area = 0
     for i in range(len(x)):
-        results.append(pool.apply_async(one_oring,(x[i],y[i],t,w,grid)))
+        self_count = False
 
-    #Close down workers to finish calculating results
-    pool.close()
-    pool.join()
+        coords = ring(x[i],y[i],t,w,grid)
+        n_coords = np.shape(coords)[1]
 
-    #collate results
-    finished_results = np.empty([len(x),2])
-    for i in range(len(x)):
-        finished_results[i,:] = results[i].get()
-    area = np.float(np.sum(finished_results[:,0]))
-    yso_sum = np.sum(finished_results[:,1])
+        xg,yg = xy2grid(x[i],y[i])
+        for j in range(n_coords):
+
+            #Allow o-ring to skip one point within its own grid square.
+            if coords[0,j]==xg and coords[1,j]==yg and self_count == False:
+                yso_sum-=1
+
+            area += area_array[coords[0,j],coords[1,j]]
+            yso_sum+=yso_map[coords[0,j],coords[1,j]]
 
     total_area = get_area()
     lmda = np.sum(yso_map)/total_area
@@ -439,7 +419,7 @@ def Oring(x,y,t,w,yso_map=None,grid=None,opti=False,diag=False):
         return O, O/lmda, yso_sum, float(area)
     else:
         return O, O/lmda
-    
+     
 def ring(xp,yp,R,w,grid=None,relative=False):
     """
     Finds all the grid squares that are in an annulus around
