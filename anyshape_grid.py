@@ -70,17 +70,20 @@ def box_check(xg,yg,Lx,Ly=None,grid=None):
     else:
         return True
 
-def circle_check(xp,yp,R,grid=None):
+def circle_check(xp,yp,R,po=None,grid=None):
     """
     Checks if there are any cells not covered by coverage map, or
     exceed the bounds of the coverage map within circle of radius R,
     centered on xp,yp.
     Returns False if not entirely within map.
     """
+    if po is None:
+        po = pixel_origin
+        
     if grid is None:
         grid = coverage
 
-    xg,yg = xy2grid(xp,yp)
+    xg,yg = xy2grid(xp,yp,po)
     Rx = delDist2Grid(R,axis='x')
     Ry = delDist2Grid(R,axis='y')
 
@@ -148,11 +151,16 @@ def make_grid(n_areas,n_length,n_height):
 
     return grid
 
-def xy2grid(v1,v2,wcs_obj=None):
+def xy2grid(v1,v2,po=None,wcs_obj=None):
     """
     convert world coordinates (v1,v2) to grid coordinates
     (i,j).
+    po = pixel_origin defines the conversion of grid i,j values in the coverage map
+    to the i,j values of an extracted portion of the coverage map.
     """
+    if po is None:
+        po = pixel_origin
+        
     if wcs_obj is None:
         wcs_obj = w_obj
 
@@ -161,20 +169,24 @@ def xy2grid(v1,v2,wcs_obj=None):
     else:
         i,j = wcs_obj.all_world2pix(v1,v2,0)
         
-    return int(np.round(i)),int(np.round(j))
+    return int(np.round(i)-po[0]),int(np.round(j)-po[1])
 
-def ij2xy(i,j,wcs_obj=None):
+def ij2xy(i,j,po=None,wcs_obj=None):
     """
     convert grid coordinates (i,j) to world coordinates.
+    po = pixel_origin defines the conversion of grid i,j values in the coverage map
+    to the i,j values of an extracted portion of the coverage map.
     """
-    
+    if po is None:
+        po = pixel_origin
+        
     if wcs_obj is None:
         wcs_obj = w_obj
 
     if inverted == True:
-        y,x = wcs_obj.all_pix2world(j,i,0)
+        y,x = wcs_obj.all_pix2world(j+po[1],i+po[0],0)
     else:
-        x,y = wcs_obj.all_pix2world(i,j,0)
+        x,y = wcs_obj.all_pix2world(i+po[0],j+po[1],0)
     return x,y
 
 def delDist2Grid(v2,v1=0,axis=None):
@@ -183,19 +195,22 @@ def delDist2Grid(v2,v1=0,axis=None):
     elif axis == 'y':
         return int((v2-v1)/float(dy))
 
-def inside_check(v1,v2,wcs_obj=None):
+def inside_check(v1,v2,po=None,wcs_obj=None):
     """
     Checks if coordinates (RA,Dec) are inside of coverage
     map given by wcs_obj.
     Returns False if not inside coverage map.
     """
+    if po is None:
+        po = pixel_origin
+        
     if wcs_obj is None:
         wcs_obj = w_obj
     if inverted == True:
         cdec,cra = wcs_obj.all_world2pix(v2,v1,0)
     else:
         cra,cdec = wcs_obj.all_world2pix(v1,v2,0)
-    if  0 <= cra < ra_axis and 0 <= cdec < dec_axis:
+    if  po[0] <= cra < po[0]+ra_axis and po[1] <= cdec < po[1]+dec_axis:
         return True
     else:
         return False
@@ -224,14 +239,21 @@ def circle(xp,yp,R,grid=None,relative=False):
     elif relative == True:
         return np.array([co_x,co_y])-np.array([xg,yg]).reshape(2,1)
     
-def yso_to_grid(yso,grid=None,yso_return=False):
+def yso_to_grid(yso,po=None,grid=None,yso_return=False):
     """
     Make a new grid to place YSOs into using grid as a mask
     and basis of next grid.
     yso should by a 2xN array containing x and y values.
+
+    po = pixel_origin defines the conversion of grid i,j values in the coverage map
+    to the i,j values of an extracted portion of the coverage map.
+
     Optional yso_return function. Returns yso coordinates
     that were inside coverage map.
     """
+    if po is None:
+        po = pixel_origin
+        
     #Check yso_return is boolean
     if not type(yso_return) == bool:
         print('yso_return must be a boolean')
@@ -246,7 +268,7 @@ def yso_to_grid(yso,grid=None,yso_return=False):
     N = np.shape(yso)[1]
     fail_count = 0
     for i in range(N):
-        x,y = xy2grid(yso[0,i],yso[1,i])
+        x,y = xy2grid(yso[0,i],yso[1,i],po)
         if x is None or y is None:
              fail_count += 1
              continue
@@ -254,7 +276,7 @@ def yso_to_grid(yso,grid=None,yso_return=False):
         if yso_return == True:
             filtered_ysos[0].append(yso[0,i])
             filtered_ysos[1].append(yso[1,i])
-        yso_map[xy2grid(yso[0,i],yso[1,i])] += 1
+        yso_map[xy2grid(yso[0,i],yso[1,i],po)] += 1
 
     if fail_count > 0:
         print('{:d} YSOs failed to position'.format(fail_count))
@@ -264,7 +286,7 @@ def yso_to_grid(yso,grid=None,yso_return=False):
     elif yso_return == False:
         return yso_map*grid
     
-def random_ysos(val,mode='binomial',grid=None):
+def random_ysos(val,mode='binomial',po=None,grid=None):
     """
     Function to populate a grid with random YSOs. YSOs can be placed anywhere
     with grid == 1.
@@ -275,7 +297,9 @@ def random_ysos(val,mode='binomial',grid=None):
     Both return the coordinates of the ysos and the completed grid.
     Assumes a uniform probability across the coverage map.
     """
-
+    if po is None:
+        po = pixel_origin
+        
     if grid is None:
         grid = coverage
 
@@ -296,9 +320,9 @@ def random_ysos(val,mode='binomial',grid=None):
 
             if Nyso > 0:
                 if inverted:
-                    y,x = w_obj.all_pix2world(rnd.rand(Nyso)+j,rnd.rand(Nyso)+i,0)
+                    y,x = w_obj.all_pix2world(po[1]+rnd.rand(Nyso)+j,po[0]+rnd.rand(Nyso)+i,0)
                 else:
-                    x,y = w_obj.all_pix2world(rnd.rand(Nyso)+i,rnd.rand(Nyso)+j,0)
+                    x,y = w_obj.all_pix2world(po[0]+rnd.rand(Nyso)+i,po[1]+rnd.rand(Nyso)+j,0)
 
                 yso_x = np.append(yso_x,x)
                 yso_y = np.append(yso_y,y)
@@ -311,9 +335,9 @@ def random_ysos(val,mode='binomial',grid=None):
             i,j = inside_pixels[0,rand_pixel], inside_pixels[1,rand_pixel]
             yso_map[i,j] += 1
             if inverted:
-                y,x = w_obj.all_pix2world(rnd.rand()+j,rnd.rand()+i,0)
+                y,x = w_obj.all_pix2world(po[1]+rnd.rand()+j,po[0]+rnd.rand()+i,0)
             else:
-                x,y = w_obj.all_pix2world(rnd.rand()+i,rnd.rand()+j,0)
+                x,y = w_obj.all_pix2world(po[0]+rnd.rand()+i,po[1]+rnd.rand()+j,0)
             yso_x = np.append(yso_x,x)
             yso_y = np.append(yso_y,y)
             
@@ -326,7 +350,7 @@ def kfunc(x,y,t,yso_map=None,grid=None,opti=False,diag=False):
     """
 
     if yso_map is None:
-        yso_map = yso_to_grid(np.array([x,y]),grid)
+        yso_map = yso_to_grid(np.array([x,y]),grid=grid)
         
     if grid is None:
         grid = coverage
@@ -335,11 +359,6 @@ def kfunc(x,y,t,yso_map=None,grid=None,opti=False,diag=False):
     #algorithm. This accounts for the self-counting.
     yso_sum = -np.sum(yso_map)
     area = 0
-
-    #Generate relative circle coords for approx centre of map
-    shape = np.shape(yso_map)
-    x_mid,y_mid = ij2xy(shape[0]/2,shape[1]/2)
-    print(len(x))
     for i in range(len(x)):
 
         coords = circle(x[i],y[i],t,grid)
@@ -348,7 +367,6 @@ def kfunc(x,y,t,yso_map=None,grid=None,opti=False,diag=False):
         
         for j in range(n_coords):
             yso_sum+=yso_map[coords[0,j],coords[1,j]]
-            print(area_array[coords[0,j],coords[1,j]])
             area += area_array[coords[0,j],coords[1,j]]
 
     total_area = get_area()
@@ -390,7 +408,7 @@ def Oring(x,y,t,w,yso_map=None,grid=None,opti=False,diag=False):
     """
 
     if yso_map is None:
-        yso_map = yso_to_grid(np.array([x,y]),grid)
+        yso_map = yso_to_grid(np.array([x,y]),grid=grid)
         
     if grid is None:
         grid = coverage
@@ -462,7 +480,7 @@ def gfunc(x,y,t,yso_map=None,grid=None):
         grid = coverage
         
     if yso_map is None:
-        yso_map,xy = yso_to_grid(np.array([x,y]),grid,yso_return = True)
+        yso_map,xy = yso_to_grid(np.array([x,y]),grid=grid,yso_return = True)
         x,y = xy[0,:],xy[1,:]
         
     x = np.copy(x)
@@ -516,7 +534,7 @@ def ffunc(x,y,t,a=None,b=None,yso_map=None,grid=None):
         grid = coverage
     
     if yso_map is None:
-        yso_map, xy = yso_to_grid(np.array([x,y]),grid,yso_return=True)
+        yso_map, xy = yso_to_grid(np.array([x,y]),grid=grid,yso_return=True)
         x,y = xy[0,:],xy[1,:]
 
     #deal with random positions
@@ -537,7 +555,7 @@ def ffunc(x,y,t,a=None,b=None,yso_map=None,grid=None):
         else:
             #copy a and b, filter by coverage map and return
             a,b = np.copy(a),np.copy(b)
-            ab_map, ab = yso_to_grid(np.array([a,b]),grid,yso_return=True)
+            ab_map, ab = yso_to_grid(np.array([a,b]),grid=grid,yso_return=True)
             a,b = ab[0,:],ab[1,:]
         
     x = np.copy(x)
@@ -660,13 +678,16 @@ def get_area_array(tan=True,grid=None):
         #celestial steradians for all pixels
         return angle_part*(dRA*dDec)/(np.cos(theta)**2)
 
-def angle2box(xp,yp,t):
+def angle2box(xp,yp,t,po=None):
     """
     Calculate a VERY conservative estimate of the grid squares
     that cover an angular distance t.
     Returns the i and j values of bottom left and top right
     corners.
     """
+    if po is None:
+        po = pixel_origin
+        
     t = np.sqrt(2)*t
     if inverted:
         j,i = w_obj.all_world2pix(yp,xp,0)
@@ -682,16 +703,16 @@ def angle2box(xp,yp,t):
         il,jl = w_obj.all_world2pix(xp-t,yp-t,0)
         ir,jr = w_obj.all_world2pix(xp+t,yp+t,0)
 
-    if jl < 0:
-        jl = 0
-    if il < 0:
-        il = 0
-    if ir > ra_axis:
-        ir = ra_axis
-    if jr > dec_axis:
-        jr = dec_axis
+    if jl < po[1]:
+        jl = po[1]
+    if il < po[0]:
+        il = po[0]
+    if ir > po[0]+ra_axis:
+        ir = po[0]+ra_axis
+    if jr > po[1]+dec_axis:
+        jr = po[1]+dec_axis
 
-    return int(il),int(ir),int(jl),int(jr)
+    return int(il-po[0]),int(ir-po[0]),int(jl-po[1]),int(jr-po[1])
 
 def collate(results):
     array = np.empty([4,LOOPS,len(r)])
@@ -735,12 +756,15 @@ dec_box,ra_box = w_obj.all_world2pix((bl_dec,tr_dec),(bl_ra,tr_ra),0)
 dec_box = np.round(dec_box)
 ra_box = np.round(ra_box)
 
+##pixel_origin defines where the ra and dec of pixel centres begin for
+#extracted section of map in terms of .
+pixel_origin = (int(ra_box[0]),int(dec_box[0]))
 coverage = coverage[int(ra_box[0]):int(ra_box[1]),int(dec_box[0]):int(dec_box[1])]
 
 #Remove non-binary values from coverage map
-cov2 = np.zeros(np.shape(coverage))
-#cov2 = np.ones(np.shape(coverage))
-cov2 += coverage == 1
+#cov2 = np.zeros(np.shape(coverage))
+cov2 = np.ones(np.shape(coverage))
+#cov2 += coverage == 1
 
 coverage = cov2.astype(bool)
 cov2 = None
@@ -763,25 +787,26 @@ GX, GY = None, None
 area_array = get_area_array()
 total_area = np.sum(area_array)
 
-val = 50
-yso,yso_map = random_ysos(val,mode='binomial',grid=coverage)
+#val = 50
+#yso,yso_map = random_ysos(val,mode='binomial',grid=coverage)
+yso = np.array([[276.5,277],[-3,-3]])
 print(np.shape(coverage))
 
 ##Decide number of processes
 noProcesses = 4
 
-steps = 5
-r = np.linspace(0.3,1.5,steps)
+steps = 1
+r = [0.5]
 w = 0.1
 
 results = np.empty((2,steps))
 for i,t in enumerate(r):
     ##Oring
-    o, oo = Oring(yso[0,:],yso[1,:],t,w)
-    k,kk = kfunc(yso[0,:],yso[1,:],t)
+    o, oo,o3,o4 = Oring(yso[0,:],yso[1,:],t,w,diag=True)
+#    k,kk = kfunc(yso[0,:],yso[1,:],t)
     
     results[0,i] = oo
-    results[1,i] = kk
+#    results[1,i] = kk
 
 
 plt.figure()
@@ -791,10 +816,13 @@ plt.ylabel('Oring')
 plt.title('Oring')
 
 
-plt.figure()
-plt.plot(r,results[1,:])
-plt.xlabel('r (angle)')
-plt.ylabel('L')
-plt.title("L")
+#plt.figure()
+#plt.plot(r,results[1,:])
+#plt.xlabel('r (angle)')
+#plt.ylabel('L')
+#plt.title("L")
 
+plt.figure()
+plt.plot(yso[0,:],yso[1,:],'*')
+plt.pcolormesh(gx,gy,coverage)
 plt.show()
