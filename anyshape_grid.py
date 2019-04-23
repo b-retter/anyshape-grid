@@ -343,45 +343,86 @@ def random_ysos(val,mode='binomial',po=None,grid=None):
             
         return np.vstack([yso_x,yso_y]), yso_map
 
-def kfunc(x,y,t,yso_map=None,grid=None,opti=False,diag=False):
+def one_kfunc(x1,y1,t,yso_map,grid):
+    """
+    Returns the number of ysos and area in circle around 
+    a given yso at position x1,y1.
+    """
+    coords = circle(x1,y1,t,grid)
+                
+    n_coords = np.shape(coords)[1]
+
+    #subtract one from yso_sum to stop self-counting
+    yso_sum = -1
+    area = 0
+    for j in range(n_coords):
+        yso_sum+=yso_map[coords[0,j],coords[1,j]]
+        area += area_array[coords[0,j],coords[1,j]]
+    
+    return np.array([area,yso_sum])
+
+def kfunc(x,y,t,yso_map=None,grid=None,noP=None,diag=False):
     """
     Calculates K function for points with coords x,y.
     Most likely x and y are the positions of yso.
     """
-
+    #if values not specified take global values.
     if yso_map is None:
         yso_map = yso_to_grid(np.array([x,y]),grid=grid)
         
     if grid is None:
         grid = coverage
 
-    #yso will each count themselves once over the course of the 
-    #algorithm. This accounts for the self-counting.
-    yso_sum = -np.sum(yso_map)
-    area = 0
-    for i in range(len(x)):
-
-        coords = circle(x[i],y[i],t,grid)
-                
-        n_coords = np.shape(coords)[1]
+    if noP is None:
+        noP = noProcesses
         
-        for j in range(n_coords):
-            yso_sum+=yso_map[coords[0,j],coords[1,j]]
-            area += area_array[coords[0,j],coords[1,j]]
+    if noP > 1:
+        print('Kfunc: parallelised')
+        start = timer()
+        ##Initialise pool of workers
+        pool = mp.Pool(noP)
 
+        ##Perform one_kfunc for each yso using workers
+        results = []
+        for i in range(len(x)):
+            results.append(pool.apply_async(one_kfunc,(x[i],y[i],t,yso_map,grid)))
+
+        #Close down workers to finish calculating results
+        pool.close()
+        pool.join()
+
+        #collate results
+        finished_results = np.empty([len(x),2])
+        for i in range(len(x)):
+            finished_results[i,:] = results[i].get()
+    else:
+        print('Kfunc: not parallelised')
+        start = timer()
+        #If there are fewer than 2 workers specified, then ignore
+        #multiprocessing.
+        
+        ##Perform one_kfunc for each yso
+        finished_results = np.empty([len(x),2])
+        for i in range(len(x)):
+            finished_results[i,:] = one_kfunc(x[i],y[i],t,yso_map,grid)
+            
+    area = np.float(np.sum(finished_results[:,0]))
+    yso_sum = np.sum(finished_results[:,1])
+    
     total_area = get_area()
     lmda = np.sum(yso_map)/total_area
     K = (np.pi*t**2/lmda)*yso_sum/float(area)
     L = np.sqrt(K/np.pi) - t
+    print('Finished in {:.3f} seconds'.format(timer()-start))
     if diag == True:
         return K,L,yso_sum,float(area)
     else:
         return K, L
 
-def one_oring(x1,y1,t,w,grid):
+def one_oring(x1,y1,t,w,yso_map,grid):
     """
-    Returns the number of ysos and area around a given yso
-    at position x1,y1.
+    Returns the number of ysos and area in annulus around 
+    a given yso at position x1,y1.
     """
     self_count = False
 
@@ -401,40 +442,60 @@ def one_oring(x1,y1,t,w,grid):
         yso_sum += yso_map[coords[0,j],coords[1,j]]
     return np.array([area,yso_sum])
     
-def Oring(x,y,t,w,yso_map=None,grid=None,opti=False,diag=False):
+def Oring(x,y,t,w,yso_map=None,grid=None,noP=None,diag=False):
     """
     Calculates Oring function for points with coords x,y.
     Most likely x and y are the positions of ysos.
+    noP is number of processes.
     """
 
+    #if values not specified take global values
     if yso_map is None:
         yso_map = yso_to_grid(np.array([x,y]),grid=grid)
         
     if grid is None:
         grid = coverage
 
-    ##Initialise pool of workers
-    pool = mp.Pool(noProcesses)
+    if noP is None:
+        noP = noProcesses
     
-    ##Perform one_oring for each yso using workers
-    results = []
-    for i in range(len(x)):
-        results.append(pool.apply_async(one_oring,(x[i],y[i],t,w,grid)))
+    if noP > 1:
+        print('Oring: parallelised')
+        start = timer()
+        ##Initialise pool of workers
+        pool = mp.Pool(noP)
 
-    #Close down workers to finish calculating results
-    pool.close()
-    pool.join()
+        ##Perform one_oring for each yso using workers
+        results = []
+        for i in range(len(x)):
+            results.append(pool.apply_async(one_oring,(x[i],y[i],t,w,yso_map,grid)))
 
-    #collate results
-    finished_results = np.empty([len(x),2])
-    for i in range(len(x)):
-        finished_results[i,:] = results[i].get()
+        #Close down workers to finish calculating results
+        pool.close()
+        pool.join()
+
+        #collate results
+        finished_results = np.empty([len(x),2])
+        for i in range(len(x)):
+            finished_results[i,:] = results[i].get()
+    else:
+        print('Oring: not parallelised')
+        start = timer()
+        #If there are fewer than 2 workers specified, then ignore
+        #multiprocessing.
+        
+        ##Perform one_oring for each yso
+        finished_results = np.empty([len(x),2])
+        for i in range(len(x)):
+            finished_results[i,:] = one_oring(x[i],y[i],t,w,yso_map,grid)
+            
     area = np.float(np.sum(finished_results[:,0]))
     yso_sum = np.sum(finished_results[:,1])
 
     total_area = get_area()
     lmda = np.sum(yso_map)/total_area
     O = yso_sum/float(area)
+    print('Finished in {:.3f} seconds'.format(timer()-start))
     if diag == True:
         return O, O/lmda, yso_sum, float(area)
     else:
@@ -787,42 +848,45 @@ GX, GY = None, None
 area_array = get_area_array()
 total_area = np.sum(area_array)
 
-#val = 50
-#yso,yso_map = random_ysos(val,mode='binomial',grid=coverage)
-yso = np.array([[276.5,277],[-3,-3]])
+val = 50
+yso,yso_map = random_ysos(val,mode='binomial',grid=coverage)
+#yso = np.array([[276.5,277],[-3,-3]])
+#yso_map = yso_to_grid(yso)
 print(np.shape(coverage))
 
 ##Decide number of processes
 noProcesses = 4
 
-steps = 1
-r = [0.5]
-w = 0.1
+steps = 3
+r = np.linspace(0.1,0.5,3)
+w = 0.05
 
-results = np.empty((2,steps))
+results = np.empty((4,steps))
 for i,t in enumerate(r):
     ##Oring
-    o, oo,o3,o4 = Oring(yso[0,:],yso[1,:],t,w,diag=True)
-#    k,kk = kfunc(yso[0,:],yso[1,:],t)
-    
+    o,oo = Oring(yso[0,:],yso[1,:],t,w)
     results[0,i] = oo
-#    results[1,i] = kk
+    o,oo = Oring(yso[0,:],yso[1,:],t,w,noP=1)
+    results[1,i] = oo
+    k,kk = kfunc(yso[0,:],yso[1,:],t)
+    results[2,i] = kk
+    k,kk = kfunc(yso[0,:],yso[1,:],t,noP=1)
+    results[3,i] = kk
 
 
 plt.figure()
-plt.plot(r,results[0,:])
+plt.plot(r,results[0,:],'b')
+plt.plot(r,results[1,:],'r')
 plt.xlabel('r')
 plt.ylabel('Oring')
 plt.title('Oring')
 
 
-#plt.figure()
-#plt.plot(r,results[1,:])
-#plt.xlabel('r (angle)')
-#plt.ylabel('L')
-#plt.title("L")
-
 plt.figure()
-plt.plot(yso[0,:],yso[1,:],'*')
-plt.pcolormesh(gx,gy,coverage)
+plt.plot(r,results[2,:],'b')
+plt.plot(r,results[3,:],'r')
+plt.xlabel('r (angle)')
+plt.ylabel('L')
+plt.title("L")
+
 plt.show()
