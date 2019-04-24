@@ -276,6 +276,7 @@ def yso_to_grid(yso,po=None,grid=None,yso_return=False):
         if yso_return == True:
             filtered_ysos[0].append(yso[0,i])
             filtered_ysos[1].append(yso[1,i])
+        print(i)
         yso_map[xy2grid(yso[0,i],yso[1,i],po)] += 1
 
     if fail_count > 0:
@@ -800,8 +801,8 @@ else:
     dec_axis = header['NAXIS2']
 
 ##Extracting sections of map
-bl_ra,bl_dec = 275,-4.5
-tr_ra, tr_dec = 278.5,-1
+bl_ra,bl_dec = 277.2,-2.25
+tr_ra, tr_dec = 277.7,-1.75
 dec_box,ra_box = w_obj.all_world2pix((bl_dec,tr_dec),(bl_ra,tr_ra),0)
 dec_box = np.round(dec_box)
 ra_box = np.round(ra_box)
@@ -837,18 +838,23 @@ GX, GY = None, None
 area_array = get_area_array()
 total_area = np.sum(area_array)
 
+##Getting ysos
+dfile = '/Users/bretter/Documents/StarFormation/SFR_data/serpens_south_yso.txt'
+data = np.loadtxt(dfile,skiprows=1,usecols=(2,3))
+yso = data.T
 val = 50
-#yso,yso_map = random_ysos(val,mode='binomial',grid=coverage)
-ysox,ysoy = w_obj.all_pix2world(np.array([5,10])+po[1],np.array([5,10])+po[0],0)
-yso = np.array([[276.5,277],[-3,-3]])
+yso,yso_map = random_ysos(val,mode='binomial',grid=coverage)
+#po = pixel_origin
+#ysox,ysoy = w_obj.all_pix2world(np.array([5,10])+po[1],np.array([5,10])+po[0],0)
+#yso = np.array([[276.5,277],[-3,-3]])
 #yso_map = yso_to_grid(yso)
 print(np.shape(coverage))
 
 ##Decide number of processes
-noProcesses = 4
+noProcesses = 1
 
 steps = 3
-r = np.linspace(0.1,0.5,3)
+r = np.linspace(0.1,0.25,3)
 w = 0.05
 
 results = np.empty((4,steps))
@@ -879,4 +885,7 @@ plt.xlabel('r (angle)')
 plt.ylabel('L')
 plt.title("L")
 
+plt.figure()
+plt.pcolormesh(gx,gy,coverage)
+plt.plot(yso[0,:],yso[1,:],'*')
 plt.show()
