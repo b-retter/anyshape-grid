@@ -365,6 +365,9 @@ def kfunc(x,y,t,yso_map=None,grid=None,noP=None,diag=False):
     """
     Calculates K function for points with coords x,y.
     Most likely x and y are the positions of yso.
+    noP determines the number of workers assigned to function for 
+    multiprocessing. A value of None or 1 runs the function 
+    without multiprocessing.
     """
     #if values not specified take global values.
     if yso_map is None:
@@ -372,13 +375,8 @@ def kfunc(x,y,t,yso_map=None,grid=None,noP=None,diag=False):
         
     if grid is None:
         grid = coverage
-
-    if noP is None:
-        noP = noProcesses
         
     if noP > 1:
-        print('Kfunc: parallelised')
-        start = timer()
         ##Initialise pool of workers
         pool = mp.Pool(noP)
 
@@ -395,9 +393,7 @@ def kfunc(x,y,t,yso_map=None,grid=None,noP=None,diag=False):
         finished_results = np.empty([len(x),2])
         for i in range(len(x)):
             finished_results[i,:] = results[i].get()
-    else:
-        print('Kfunc: not parallelised')
-        start = timer()
+    elif noP == 1 or noP == None:
         #If there are fewer than 2 workers specified, then ignore
         #multiprocessing.
         
@@ -413,7 +409,6 @@ def kfunc(x,y,t,yso_map=None,grid=None,noP=None,diag=False):
     lmda = np.sum(yso_map)/total_area
     K = (np.pi*t**2/lmda)*yso_sum/float(area)
     L = np.sqrt(K/np.pi) - t
-    print('Finished in {:.3f} seconds'.format(timer()-start))
     if diag == True:
         return K,L,yso_sum,float(area)
     else:
@@ -446,7 +441,9 @@ def Oring(x,y,t,w,yso_map=None,grid=None,noP=None,diag=False):
     """
     Calculates Oring function for points with coords x,y.
     Most likely x and y are the positions of ysos.
-    noP is number of processes.
+    noP determines the number of workers assigned to function for 
+    multiprocessing. A value of None or 1 runs the function 
+    without multiprocessing.
     """
 
     #if values not specified take global values
@@ -455,13 +452,8 @@ def Oring(x,y,t,w,yso_map=None,grid=None,noP=None,diag=False):
         
     if grid is None:
         grid = coverage
-
-    if noP is None:
-        noP = noProcesses
     
     if noP > 1:
-        print('Oring: parallelised')
-        start = timer()
         ##Initialise pool of workers
         pool = mp.Pool(noP)
 
@@ -478,9 +470,7 @@ def Oring(x,y,t,w,yso_map=None,grid=None,noP=None,diag=False):
         finished_results = np.empty([len(x),2])
         for i in range(len(x)):
             finished_results[i,:] = results[i].get()
-    else:
-        print('Oring: not parallelised')
-        start = timer()
+    elif noP == 1 or noP == None:
         #If there are fewer than 2 workers specified, then ignore
         #multiprocessing.
         
@@ -495,7 +485,6 @@ def Oring(x,y,t,w,yso_map=None,grid=None,noP=None,diag=False):
     total_area = get_area()
     lmda = np.sum(yso_map)/total_area
     O = yso_sum/float(area)
-    print('Finished in {:.3f} seconds'.format(timer()-start))
     if diag == True:
         return O, O/lmda, yso_sum, float(area)
     else:
@@ -849,8 +838,9 @@ area_array = get_area_array()
 total_area = np.sum(area_array)
 
 val = 50
-yso,yso_map = random_ysos(val,mode='binomial',grid=coverage)
-#yso = np.array([[276.5,277],[-3,-3]])
+#yso,yso_map = random_ysos(val,mode='binomial',grid=coverage)
+ysox,ysoy = w_obj.all_pix2world(np.array([5,10])+po[1],np.array([5,10])+po[0],0)
+yso = np.array([[276.5,277],[-3,-3]])
 #yso_map = yso_to_grid(yso)
 print(np.shape(coverage))
 
