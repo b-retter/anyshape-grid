@@ -276,7 +276,6 @@ def yso_to_grid(yso,po=None,grid=None,yso_return=False):
         if yso_return == True:
             filtered_ysos[0].append(yso[0,i])
             filtered_ysos[1].append(yso[1,i])
-        print(i)
         yso_map[xy2grid(yso[0,i],yso[1,i],po)] += 1
 
     if fail_count > 0:
@@ -801,16 +800,20 @@ else:
     dec_axis = header['NAXIS2']
 
 ##Extracting sections of map
-bl_ra,bl_dec = 277.2,-2.25
-tr_ra, tr_dec = 277.7,-1.75
-dec_box,ra_box = w_obj.all_world2pix((bl_dec,tr_dec),(bl_ra,tr_ra),0)
+#desired sector of sky bottom-left and top-right.
+bl = (277.2,-2.25)
+tr = (277.7,-1.75)
+
+tl,br = (bl[0],tr[1]),(tr[0],bl[1])
+dec_box,ra_box = w_obj.all_world2pix(np.array([bl[1],br[1],tl[1],tr[1]]),np.array([bl[0],br[0],tl[0],tr[0]]),0)
 dec_box = np.round(dec_box)
 ra_box = np.round(ra_box)
+ra_lims,dec_lims = (np.min(ra_box),np.max(ra_box)),(np.min(dec_box),np.max(dec_box))
 
 ##pixel_origin defines where the ra and dec of pixel centres begin for
 #extracted section of map in terms of .
-pixel_origin = (int(ra_box[0]),int(dec_box[0]))
-coverage = coverage[int(ra_box[0]):int(ra_box[1]),int(dec_box[0]):int(dec_box[1])]
+pixel_origin = (int(ra_lims[0]),int(dec_lims[0]))
+coverage = coverage[int(ra_lims[0]):int(ra_lims[1]),int(dec_lims[0]):int(dec_lims[1])]
 
 #Remove non-binary values from coverage map
 #cov2 = np.zeros(np.shape(coverage))
@@ -824,12 +827,15 @@ ra_axis,dec_axis = np.shape(coverage)
 
 ##Getting celestial coordinates of pixel centres
 #
-gx = np.arange(ra_box[0],ra_box[1])
-gy = np.arange(dec_box[0],dec_box[1])
+gx = np.arange(ra_lims[0],ra_lims[1])
+gy = np.arange(dec_lims[0],dec_lims[1])
 GX,GY = np.meshgrid(gx,gy,indexing='ij')
 GX,GY = GX.flatten(), GY.flatten()
 gy,gx = w_obj.all_pix2world(GY,GX,0)
 gx, gy = gx.reshape(ra_axis,dec_axis), gy.reshape(ra_axis,dec_axis)
+
+remove_extra_coverage = np.where( (gx < bl[0]) | (gx > tr[0]) | (gy < bl[1]) | (gy > tr[1]))
+coverage[remove_extra_coverage] = False
 
 ##Clear GX and GY from memory
 GX, GY = None, None
@@ -843,11 +849,11 @@ dfile = '/Users/bretter/Documents/StarFormation/SFR_data/serpens_south_yso.txt'
 data = np.loadtxt(dfile,skiprows=1,usecols=(2,3))
 yso = data.T
 val = 50
-yso,yso_map = random_ysos(val,mode='binomial',grid=coverage)
+#yso,yso_map = random_ysos(val,mode='binomial',grid=coverage)
 #po = pixel_origin
 #ysox,ysoy = w_obj.all_pix2world(np.array([5,10])+po[1],np.array([5,10])+po[0],0)
 #yso = np.array([[276.5,277],[-3,-3]])
-#yso_map = yso_to_grid(yso)
+yso_map = yso_to_grid(yso)
 print(np.shape(coverage))
 
 ##Decide number of processes
@@ -858,16 +864,16 @@ r = np.linspace(0.1,0.25,3)
 w = 0.05
 
 results = np.empty((4,steps))
-for i,t in enumerate(r):
+#for i,t in enumerate(r):
     ##Oring
-    o,oo = Oring(yso[0,:],yso[1,:],t,w)
-    results[0,i] = oo
-    o,oo = Oring(yso[0,:],yso[1,:],t,w,noP=1)
-    results[1,i] = oo
-    k,kk = kfunc(yso[0,:],yso[1,:],t)
-    results[2,i] = kk
-    k,kk = kfunc(yso[0,:],yso[1,:],t,noP=1)
-    results[3,i] = kk
+    #o,oo = Oring(yso[0,:],yso[1,:],t,w)
+    #results[0,i] = oo
+    #o,oo = Oring(yso[0,:],yso[1,:],t,w,noP=1)
+    #results[1,i] = oo
+    #k,kk = kfunc(yso[0,:],yso[1,:],t)
+    #results[2,i] = kk
+    #k,kk = kfunc(yso[0,:],yso[1,:],t,noP=1)
+    #results[3,i] = kk
 
 
 plt.figure()
@@ -886,6 +892,11 @@ plt.ylabel('L')
 plt.title("L")
 
 plt.figure()
-plt.pcolormesh(gx,gy,coverage)
+plt.pcolormesh(gx,gy,yso_map)
 plt.plot(yso[0,:],yso[1,:],'*')
+#plt.plot((bl[0],tl[0],tr[0],br[0],bl[0]),(bl[1],tl[1],tr[1],br[1],bl[1]),'r')
+
 plt.show()
+
+
+
