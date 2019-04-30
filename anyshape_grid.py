@@ -196,7 +196,7 @@ def inside_check(v1,v2,wcs_obj=None):
         cdec,cra = wcs_obj.all_world2pix(v2,v1,0)
     else:
         cra,cdec = wcs_obj.all_world2pix(v1,v2,0)
-    if  0 <= cra < ra_axis and 0 <= cdec < dec_axis:
+    if  0 <= round(cra) < ra_axis and 0 <= round(cdec) < dec_axis:
         return True
     else:
         return False
@@ -299,27 +299,51 @@ def random_ysos(val,mode='binomial',grid=None):
 
             if Nyso > 0:
                 if inverted:
-                    y,x = w_obj.all_pix2world(rnd.rand(Nyso)+j,rnd.rand(Nyso)+i,0)
+                    y,x = w_obj.all_pix2world(rnd.rand(Nyso)+j-0.5,rnd.rand(Nyso)+i-0.5,0)
                 else:
-                    x,y = w_obj.all_pix2world(rnd.rand(Nyso)+i,rnd.rand(Nyso)+j,0)
+                    x,y = w_obj.all_pix2world(rnd.rand(Nyso)+i-0.5,rnd.rand(Nyso)+j-0.5,0)
 
                 yso_x = np.append(yso_x,x)
                 yso_y = np.append(yso_y,y)
             
         return np.vstack([yso_x,yso_y]), yso_map
     
-    elif mode == 'binomial':
+    if mode == 'binomial':
         while np.sum(yso_map) < val:
             rand_pixel = rnd.randint(0,n_pixels)
             i,j = inside_pixels[0,rand_pixel], inside_pixels[1,rand_pixel]
             yso_map[i,j] += 1
             if inverted:
-                y,x = w_obj.all_pix2world(rnd.rand()+j,rnd.rand()+i,0)
+                y,x = w_obj.all_pix2world(rnd.rand()+j-0.5,rnd.rand()+i-0.5,0)
             else:
-                x,y = w_obj.all_pix2world(rnd.rand()+i,rnd.rand()+j,0)
+                x,y = w_obj.all_pix2world(rnd.rand()+i-0.5,rnd.rand()+j-0.5,0)
             yso_x = np.append(yso_x,x)
             yso_y = np.append(yso_y,y)
             
+        return np.vstack([yso_x,yso_y]), yso_map
+
+    elif mode == 'sphere_binomial':    
+        #Use sphere point picking to place ysos into coverage map using angles
+        while np.sum(yso_map) < val:
+            #Repeat until desired number of ysos have been added to the map
+            d2r = lambda x: x*np.pi/180
+            n_yso = val-int(np.sum(yso_map))
+            x = (np.max(gx)-np.min(gx))*rnd.rand(val)+np.min(gx)
+            
+            r_theta = rnd.rand(val-int(np.sum(yso_map)))
+            vmin = 0.5*(np.cos(np.pi/2-d2r(np.min(gy)))+1)
+            vmax = 0.5*(np.cos(np.pi/2-d2r(np.max(gy)))+1)
+            del_v = vmax-vmin
+            V = del_v*r_theta+vmin
+            y = 90-180/np.pi*np.arccos(2*V-1)
+
+            for i in range(n_yso):
+                if inside_check(x[i],y[i]):
+                    if grid[xy2grid(x[i],y[i])] == 1:
+                        yso_map[xy2grid(x[i],y[i])] += 1
+                        yso_x = np.append(yso_x,x[i])
+                        yso_y = np.append(yso_y,y[i])
+
         return np.vstack([yso_x,yso_y]), yso_map
 
 def one_kfunc(x1,y1,t,yso_map,grid):
@@ -739,7 +763,7 @@ def angle2box(xp,yp,t):
     if jr > dec_axis:
         jr = dec_axis
 
-    return int(il),int(ir),int(jl),int(jr)
+    return int(round(il)),int(round(ir)),int(round(jl)),int(round(jr))
 
 def collate(results):
     array = np.empty([4,LOOPS,len(r)])
@@ -756,8 +780,8 @@ Array of grid centre coordinates.
 Coverage map.
 """
 
-#fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
-fits_path = '../SFR_data'
+fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
+#fits_path = '../SFR_data'
 fits_name = 'SERAQU_IRAC1234M1_cov_sm.fits'
 coverage,header = fits.getdata(os.path.join(fits_path,fits_name), header=True)
 w_obj = wcs.WCS(header)
@@ -787,9 +811,6 @@ dec_box = np.round(dec_box)
 ra_box = np.round(ra_box)
 ra_lims,dec_lims = (np.min(ra_box),np.max(ra_box)),(np.min(dec_box),np.max(dec_box))
 
-##pixel_origin defines where the ra and dec of pixel centres begin for
-#extracted section of map in terms of .
-pixel_origin = (0,0)
 coverage = coverage[int(ra_lims[0]):int(ra_lims[1]),int(dec_lims[0]):int(dec_lims[1])]
 w_obj = w_obj[int(ra_lims[0]):int(ra_lims[1]),int(dec_lims[0]):int(dec_lims[1])]
 
@@ -827,12 +848,12 @@ total_area = np.sum(area_array)
 #data = np.loadtxt(dfile,skiprows=1,usecols=(2,3))
 #yso = data.T
 val = 50
-
-yso,yso_map = random_ysos(val,mode='binomial',grid=coverage)
+yso,yso_map = random_ysos(val,mode='sphere_binomial',grid=coverage)
 #po = pixel_origin
 #ysox,ysoy = w_obj.all_pix2world(np.array([5,10])+po[1],np.array([5,10])+po[0],0)
 #yso = np.array([[276.5,277],[-3,-3]])
 yso_map = yso_to_grid(yso)
+    
 print(np.sum(yso_map))
 print(np.shape(coverage))
 
@@ -856,20 +877,19 @@ results = np.empty((4,steps))
     #results[3,i] = kk
 
 
-plt.figure()
-plt.plot(r,results[0,:],'b')
-plt.plot(r,results[1,:],'r')
-plt.xlabel('r')
-plt.ylabel('Oring')
-plt.title('Oring')
+#plt.figure()
+#plt.plot(r,results[0,:],'b')
+#plt.plot(r,results[1,:],'r')
+#plt.xlabel('r')
+#plt.ylabel('Oring')
+#plt.title('Oring')
 
-
-plt.figure()
-plt.plot(r,results[2,:],'b')
-plt.plot(r,results[3,:],'r')
-plt.xlabel('r (angle)')
-plt.ylabel('L')
-plt.title("L")
+#plt.figure()
+#plt.plot(r,results[2,:],'b')
+#plt.plot(r,results[3,:],'r')
+#plt.xlabel('r (angle)')
+#plt.ylabel('L')
+#plt.title("L")
 
 plt.figure()
 gx = np.arange(-0.5,ra_axis-0.5)
@@ -878,11 +898,12 @@ GX,GY = np.meshgrid(gx,gy,indexing='ij')
 GX,GY = GX.flatten(), GY.flatten()
 gy,gx = w_obj.all_pix2world(GY,GX,0)
 gx, gy = gx.reshape(ra_axis,dec_axis), gy.reshape(ra_axis,dec_axis)
-plt.pcolormesh(gx,gy,yso_map)
+plt.pcolormesh(gx,gy,coverage)
 plt.plot(yso[0,:],yso[1,:],'*')
 #plt.plot((bl[0],tl[0],tr[0],br[0],bl[0]),(bl[1],tl[1],tr[1],br[1],bl[1]),'r')
 
 plt.show()
+
 
 
 
