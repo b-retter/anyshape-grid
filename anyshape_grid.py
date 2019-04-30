@@ -4,6 +4,7 @@ import numpy as np
 import numpy.random as rnd
 import matplotlib.pyplot as plt
 import multiprocessing as mp
+import time
 import sys
 import os
 from astropy.io import fits
@@ -771,6 +772,53 @@ def collate(results):
         array[:,i,:] = np.array(results[i].get())
     return array
 
+def run_csr(val,r,w,mode='sphere_binomial',noP=None,grid=None):
+    """
+    Perform desired number of runs get Oring and Kfunc data for CSR envelopes.
+    r is array of radial distances
+    w is either single value or array of bin widths
+    noP is number of desired workers to parallelise Oring and K seperately.
+    (not recommended)
+    """
+    #if values not specified take global values
+    if grid is None:
+        grid = coverage
+
+    #randomise seed
+    rnd.rand()
+
+    yso,yso_map = random_ysos(val,mode,grid)
+    steps = len(r)
+    w = 0.05
+
+    results = np.empty((2,steps))
+    for i,t in enumerate(r):
+        ##Oring
+        if type(w) == np.ndarray:
+            w_i = w[i]
+        else:
+            w_i = w
+        o,oo = Oring(yso[0,:],yso[1,:],t,w_i,yso_map,grid,noP)
+        results[0,i] = oo
+        k,kk = kfunc(yso[0,:],yso[1,:],t,yso_map,grid,noP)
+        results[1,i] = kk
+    return results
+
+def allenv(val,r,w,LOOPS,mode='sphere_binomial',noP=None,grid=None):
+    if grid is None:
+        grid = coverage
+        
+    if noP > 1:
+        #initialise multiprocessing pool with desired number of processes
+        pool = mp.Pool(noP)
+        results = []
+        for loop in range(LOOPS):
+            results.append(pool.apply_async(run_csr,(val,r,w,mode,None,grid)))
+
+        final_results = np.empty((2,LOOPS,len(r)))
+        for loop in range(LOOPS):
+            final_results[:,loop,:] = results[loop].get()
+    return final_results
 """
 Extract the relevant data from the fits file. 
 Array size.
@@ -848,59 +896,35 @@ total_area = np.sum(area_array)
 #data = np.loadtxt(dfile,skiprows=1,usecols=(2,3))
 #yso = data.T
 val = 50
-yso,yso_map = random_ysos(val,mode='sphere_binomial',grid=coverage)
-#po = pixel_origin
-#ysox,ysoy = w_obj.all_pix2world(np.array([5,10])+po[1],np.array([5,10])+po[0],0)
-#yso = np.array([[276.5,277],[-3,-3]])
-yso_map = yso_to_grid(yso)
     
-print(np.sum(yso_map))
+# print(np.sum(yso_map))
 print(np.shape(coverage))
 
 ##Decide number of processes
-noProcesses = 1
+noProcesses = 4
 
-steps = 3
-r = np.linspace(0.1,0.25,3)
+steps = 5
+r = np.linspace(0.1,0.25,steps)
 w = 0.05
 
-results = np.empty((4,steps))
-#for i,t in enumerate(r):
-    ##Oring
-    #o,oo = Oring(yso[0,:],yso[1,:],t,w)
-    #results[0,i] = oo
-    #o,oo = Oring(yso[0,:],yso[1,:],t,w,noP=1)
-    #results[1,i] = oo
-    #k,kk = kfunc(yso[0,:],yso[1,:],t)
-    #results[2,i] = kk
-    #k,kk = kfunc(yso[0,:],yso[1,:],t,noP=1)
-    #results[3,i] = kk
+start = time.time()
+results = allenv(val,r,w,4,mode='sphere_binomial',noP=noProcesses,grid=None)
+print(time.time()-start)
 
 
-#plt.figure()
-#plt.plot(r,results[0,:],'b')
-#plt.plot(r,results[1,:],'r')
-#plt.xlabel('r')
-#plt.ylabel('Oring')
-#plt.title('Oring')
 
-#plt.figure()
-#plt.plot(r,results[2,:],'b')
-#plt.plot(r,results[3,:],'r')
-#plt.xlabel('r (angle)')
-#plt.ylabel('L')
-#plt.title("L")
+results = np.mean(results,axis=1)
+plt.figure()
+plt.plot(r,results[0,:],'b')
+plt.xlabel('r')
+plt.ylabel('Oring')
+plt.title('Oring')
 
 plt.figure()
-gx = np.arange(-0.5,ra_axis-0.5)
-gy = np.arange(-0.5,dec_axis-0.5)
-GX,GY = np.meshgrid(gx,gy,indexing='ij')
-GX,GY = GX.flatten(), GY.flatten()
-gy,gx = w_obj.all_pix2world(GY,GX,0)
-gx, gy = gx.reshape(ra_axis,dec_axis), gy.reshape(ra_axis,dec_axis)
-plt.pcolormesh(gx,gy,coverage)
-plt.plot(yso[0,:],yso[1,:],'*')
-#plt.plot((bl[0],tl[0],tr[0],br[0],bl[0]),(bl[1],tl[1],tr[1],br[1],bl[1]),'r')
+plt.plot(r,results[1,:],'b')
+plt.xlabel('r (angle)')
+plt.ylabel('L')
+plt.title("L")
 
 plt.show()
 
