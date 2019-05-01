@@ -802,9 +802,15 @@ def run_csr(val,r,w,mode='sphere_binomial',noP=None,grid=None):
         results[0,i] = oo
         k,kk = kfunc(yso[0,:],yso[1,:],t,yso_map,grid,noP)
         results[1,i] = kk
+    
     return results
 
 def allenv(val,r,w,LOOPS,mode='sphere_binomial',noP=None,grid=None):
+    """
+    perform the LOOPS number of realisations using multiprocessing 
+    for increased speed producing results which can then be processed 
+    into confidence envelopes for csr.
+    """
     if grid is None:
         grid = coverage
         
@@ -813,12 +819,33 @@ def allenv(val,r,w,LOOPS,mode='sphere_binomial',noP=None,grid=None):
         pool = mp.Pool(noP)
         results = []
         for loop in range(LOOPS):
-            results.append(pool.apply_async(run_csr,(val,r,w,mode,None,grid)))
+            results.append(pool.apply_async(run_csr,(val,r,w,mode,None,grid),callback=callbackTimer))
 
         final_results = np.empty((2,LOOPS,len(r)))
         for loop in range(LOOPS):
             final_results[:,loop,:] = results[loop].get()
+    elif noP == 1 or noP == None:
+        start = time.time()
+        final_results = np.empty((2,LOOPS,len(r)))
+        for loop in range(LOOPS):
+            final_results[:,loop,:] = run_csr(val,r,w,mode,None,grid)
+
+            #estimate the time left for code to run
+            completed = loop/float(LOOPS)*100
+            est = (time.time()-start)/(60.0*loop) * (LOOPS-loop) 
+            print('%f%% complete: ~ %f more minutes' %(completed,est))
     return final_results
+
+
+#time length of project and estimate completion time
+A = []
+def callbackTimer(x):
+    toc = time.time() - tic
+    A.append(toc)
+    completed = len(A)/float(LOOPS)*100
+    est = toc/(60.0*len(A)) * (LOOPS-len(A)) #estimates the time left for code to run
+    print('%f%% complete: ~ %f more minutes' %(completed,est))
+
 """
 Extract the relevant data from the fits file. 
 Array size.
@@ -828,9 +855,10 @@ Array of grid centre coordinates.
 Coverage map.
 """
 
-fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
+#fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
 #fits_path = '../SFR_data'
-fits_name = 'SERAQU_IRAC1234M1_cov_sm.fits'
+fits_path = '.'
+fits_name = 'SERAQU_IRAC1234M1_cov.fits'
 coverage,header = fits.getdata(os.path.join(fits_path,fits_name), header=True)
 w_obj = wcs.WCS(header)
 ##Find which axis is RA and which is Dec.
@@ -892,41 +920,20 @@ area_array = get_area_array()
 total_area = np.sum(area_array)
 
 ##Getting ysos
-#dfile = '/Users/bretter/Documents/StarFormation/SFR_data/serpens_south_yso.txt'
-#data = np.loadtxt(dfile,skiprows=1,usecols=(2,3))
-#yso = data.T
-val = 50
-    
-# print(np.sum(yso_map))
-print(np.shape(coverage))
+val = 246
 
 ##Decide number of processes
-noProcesses = 4
+noProcesses = 20
 
-steps = 5
+steps = 20
 r = np.linspace(0.1,0.25,steps)
 w = 0.05
 
-start = time.time()
-results = allenv(val,r,w,4,mode='sphere_binomial',noP=noProcesses,grid=None)
-print(time.time()-start)
-
-
-
-results = np.mean(results,axis=1)
-plt.figure()
-plt.plot(r,results[0,:],'b')
-plt.xlabel('r')
-plt.ylabel('Oring')
-plt.title('Oring')
-
-plt.figure()
-plt.plot(r,results[1,:],'b')
-plt.xlabel('r (angle)')
-plt.ylabel('L')
-plt.title("L")
-
-plt.show()
+tic = time.time()
+LOOPS = 199
+results = allenv(val,r,w,LOOPS,mode='sphere_binomial',noP=noProcesses,grid=None)
+print((time.time()-tic)/60)
+np.save('serpens_r{:.2f}_{:.2f}_{.2f}_{:d}_grid',results)
 
 
 
