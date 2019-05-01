@@ -918,20 +918,29 @@ area_array = get_area_array()
 total_area = np.sum(area_array)
 
 ##Getting ysos
-val = 246
-
+dfile = 'serpens_south_yso.txt'
+data = np.loadtxt(dfile,skiprows=1,usecols=(2,3))
+yso = data.T
+yso_map = yso_to_grid(yso)
 ##Decide number of processes
-noProcesses = 20
+noProcesses = 4
 
 steps = 20
 r = np.linspace(0.1,0.25,steps)
 w = 0.05
 
-tic = time.time()
-LOOPS = 199
-results = allenv(val,r,w,LOOPS,mode='sphere_binomial',noP=noProcesses,grid=None)
-print((time.time()-tic)/60)
-np.save('serpens_r{:.2f}_{:.2f}_{.2f}_{:d}_grid',results)
+results = np.empty((2,steps))
+for i,t in enumerate(r):
+    ##Oring
+    o,oo = Oring(yso[0,:],yso[1,:],t,w,yso_map,coverage,noProcesses)
+    results[0,i] = oo
+    k,kk = kfunc(yso[0,:],yso[1,:],t,yso_map,coverage,noProcesses)
+    results[1,i] = kk
+    
+    tic = time.time()
+    print(i)
+    print((time.time()-tic)/60)
+np.save('serpens_grid_stats',results)
 
 
 
