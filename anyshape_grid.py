@@ -789,8 +789,6 @@ def run_csr(val,r,w,mode='sphere_binomial',noP=None,grid=None):
 
     yso,yso_map = random_ysos(val,mode,grid)
     steps = len(r)
-    w = 0.05
-
     results = np.empty((2,steps))
     for i,t in enumerate(r):
         ##Oring
