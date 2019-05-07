@@ -853,10 +853,10 @@ Array of grid centre coordinates.
 Coverage map.
 """
 
-#fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
+fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
 #fits_path = '../SFR_data'
-fits_path = '.'
-fits_name = 'SERAQU_IRAC1234M1_cov.fits'
+#fits_path = '.'
+fits_name = 'SERAQU_IRAC1234M1_cov_sm.fits'
 coverage,header = fits.getdata(os.path.join(fits_path,fits_name), header=True)
 w_obj = wcs.WCS(header)
 ##Find which axis is RA and which is Dec.
@@ -876,22 +876,57 @@ else:
 
 ##Extracting sections of map
 #desired sector of sky bottom-left and top-right.
+
+def extract_region(bounds,wcs_obj,grid):
+    """
+    Extract rectangular section of coverage map designated by ra and dec coordinates.
+    bounds = (2x2) array containing the boundaries of the desired section. [[Ra_0,Ra_1],[Dec_0,Dec_1]]
+    grid = array to be sliced using pixel coordinates given by wcs_obj.
+    """
+    #coordinates of bottom-left and top-right corners of RA, Dec box.
+    bl = (bounds[0,0],bounds[1,0])
+    tr = (bounds[0,1],bounds[1,1])
+    
+    tl,br = (bl[0],tr[1]),(tr[0],bl[1])
+    if inverted:
+        dec_box,ra_box = w_obj.all_world2pix(np.array([bl[1],br[1],tl[1],tr[1]]),np.array([bl[0],br[0],tl[0],tr[0]]),0)
+    else:
+        ra_box,dec_box = w_obj.all_world2pix(np.array([bl[0],br[0],tl[0],tr[0]]),np.array([bl[1],br[1],tl[1],tr[1]]),0)
+        
+    dec_box = np.round(dec_box)
+    ra_box = np.round(ra_box)
+    ra_lims,dec_lims = (np.min(ra_box),np.max(ra_box)),(np.min(dec_box),np.max(dec_box))
+
+    #slice map and wcs_object
+    grid = grid[int(ra_lims[0]):int(ra_lims[1]),int(dec_lims[0]):int(dec_lims[1])]
+    wcs_obj = wcs_obj[int(ra_lims[0]):int(ra_lims[1]),int(dec_lims[0]):int(dec_lims[1])]
+
+    ##Getting celestial coordinates of pixel centres for extraction
+    axes = np.shape(grid)
+    gx = np.arange(axes[0])
+    gy = np.arange(axes[1])
+    GX,GY = np.meshgrid(gx,gy,indexing='ij')
+    GX,GY = GX.flatten(), GY.flatten()
+    
+    if inverted:
+        gy,gx = wcs_obj.all_pix2world(GY,GX,0)
+    else:
+        gx,gy = wcs_obj.all_pix2world(GX,GY,0)
+
+    gx, gy = gx.reshape(axes[0],axes[1]), gy.reshape(axes[0],axes[1])    
+    remove_extra_coverage = np.where( (gx < bl[0]) | (gx > tr[0]) | (gy < bl[1]) | (gy > tr[1]))
+    grid[remove_extra_coverage] = False
+    return wcs_obj,grid
+
 bl = (277.2,-2.25)
 tr = (277.7,-1.75)
+bounds = np.array([[277.2,277.7],[-2.25,-1.75]])
 
-tl,br = (bl[0],tr[1]),(tr[0],bl[1])
-dec_box,ra_box = w_obj.all_world2pix(np.array([bl[1],br[1],tl[1],tr[1]]),np.array([bl[0],br[0],tl[0],tr[0]]),0)
-dec_box = np.round(dec_box)
-ra_box = np.round(ra_box)
-ra_lims,dec_lims = (np.min(ra_box),np.max(ra_box)),(np.min(dec_box),np.max(dec_box))
-
-coverage = coverage[int(ra_lims[0]):int(ra_lims[1]),int(dec_lims[0]):int(dec_lims[1])]
-w_obj = w_obj[int(ra_lims[0]):int(ra_lims[1]),int(dec_lims[0]):int(dec_lims[1])]
-
+w_obj,coverage = extract_region(bounds,w_obj,coverage)
 #Remove non-binary values from coverage map
-#cov2 = np.zeros(np.shape(coverage))
-cov2 = np.ones(np.shape(coverage))
-#cov2 += coverage == 1
+cov2 = np.zeros(np.shape(coverage))
+#cov2 = np.ones(np.shape(coverage))
+cov2 += coverage == 1
 
 coverage = cov2.astype(bool)
 cov2 = None
@@ -907,9 +942,6 @@ GX,GY = GX.flatten(), GY.flatten()
 gy,gx = w_obj.all_pix2world(GY,GX,0)
 gx, gy = gx.reshape(ra_axis,dec_axis), gy.reshape(ra_axis,dec_axis)
 
-remove_extra_coverage = np.where( (gx < bl[0]) | (gx > tr[0]) | (gy < bl[1]) | (gy > tr[1]))
-coverage[remove_extra_coverage] = False
-
 ##Clear GX and GY from memory
 GX, GY = None, None
 
@@ -918,10 +950,10 @@ area_array = get_area_array()
 total_area = np.sum(area_array)
 
 ##Getting ysos
-dfile = 'serpens_south_yso.txt'
-data = np.loadtxt(dfile,skiprows=1,usecols=(2,3))
-yso = data.T
-yso_map = yso_to_grid(yso)
+#dfile = 'serpens_south_yso.txt'
+#data = np.loadtxt(dfile,skiprows=1,usecols=(2,3))
+#yso = data.T
+#yso_map = yso_to_grid(yso)
 ##Decide number of processes
 noProcesses = 4
 
@@ -929,18 +961,21 @@ steps = 20
 r = np.linspace(0.1,0.25,steps)
 w = 0.05
 
-results = np.empty((2,steps))
-for i,t in enumerate(r):
-    ##Oring
-    o,oo = Oring(yso[0,:],yso[1,:],t,w,yso_map,coverage,noProcesses)
-    results[0,i] = oo
-    k,kk = kfunc(yso[0,:],yso[1,:],t,yso_map,coverage,noProcesses)
-    results[1,i] = kk
-    
-    tic = time.time()
-    print(i)
-    print((time.time()-tic)/60)
-np.save('serpens_grid_stats',results)
+plt.pcolormesh(gx,gy,coverage)
+plt.show()
+
+#results = np.empty((2,steps))
+#for i,t in enumerate(r):
+#    ##Oring
+#    o,oo = Oring(yso[0,:],yso[1,:],t,w,yso_map,coverage,noProcesses)
+#    results[0,i] = oo
+#    k,kk = kfunc(yso[0,:],yso[1,:],t,yso_map,coverage,noProcesses)
+#    results[1,i] = kk
+#    
+#    tic = time.time()
+#    print(i)
+#    print((time.time()-tic)/60)
+#np.save('serpens_grid_stats',results)
 
 
 
