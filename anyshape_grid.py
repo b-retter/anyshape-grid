@@ -4,14 +4,15 @@ import numpy as np
 import numpy.random as rnd
 import matplotlib.pyplot as plt
 import multiprocessing as mp
+import time
 import sys
 import os
 from astropy.io import fits
 from astropy import wcs
 
 #/Users/bretter/Documents/StarFormation/RandomDistribution/spatialStats/Functions
-sys.path.append('/Users/bretter/Documents/StarFormation/RandomDistribution/spatialStats/Functions')
-import allstats as alls
+#sys.path.append('/Users/bretter/Documents/StarFormation/RandomDistribution/spatialStats/Functions')
+#import allstats as alls
 from timeit import default_timer as timer
 
 def num_to_step(num):
@@ -70,20 +71,18 @@ def box_check(xg,yg,Lx,Ly=None,grid=None):
     else:
         return True
 
-def circle_check(xp,yp,R,po=None,grid=None):
+def circle_check(xp,yp,R,grid=None):
     """
     Checks if there are any cells not covered by coverage map, or
     exceed the bounds of the coverage map within circle of radius R,
     centered on xp,yp.
     Returns False if not entirely within map.
     """
-    if po is None:
-        po = pixel_origin
         
     if grid is None:
         grid = coverage
 
-    xg,yg = xy2grid(xp,yp,po)
+    xg,yg = xy2grid(xp,yp)
     Rx = delDist2Grid(R,axis='x')
     Ry = delDist2Grid(R,axis='y')
 
@@ -151,16 +150,11 @@ def make_grid(n_areas,n_length,n_height):
 
     return grid
 
-def xy2grid(v1,v2,po=None,wcs_obj=None):
+def xy2grid(v1,v2,wcs_obj=None):
     """
     convert world coordinates (v1,v2) to grid coordinates
     (i,j).
-    po = pixel_origin defines the conversion of grid i,j values in the coverage map
-    to the i,j values of an extracted portion of the coverage map.
     """
-    if po is None:
-        po = pixel_origin
-        
     if wcs_obj is None:
         wcs_obj = w_obj
 
@@ -169,24 +163,19 @@ def xy2grid(v1,v2,po=None,wcs_obj=None):
     else:
         i,j = wcs_obj.all_world2pix(v1,v2,0)
         
-    return int(np.round(i)-po[0]),int(np.round(j)-po[1])
+    return int(np.round(i)),int(np.round(j))
 
-def ij2xy(i,j,po=None,wcs_obj=None):
+def ij2xy(i,j,wcs_obj=None):
     """
     convert grid coordinates (i,j) to world coordinates.
-    po = pixel_origin defines the conversion of grid i,j values in the coverage map
-    to the i,j values of an extracted portion of the coverage map.
     """
-    if po is None:
-        po = pixel_origin
-        
     if wcs_obj is None:
         wcs_obj = w_obj
 
     if inverted == True:
-        y,x = wcs_obj.all_pix2world(j+po[1],i+po[0],0)
+        y,x = wcs_obj.all_pix2world(j,i,0)
     else:
-        x,y = wcs_obj.all_pix2world(i+po[0],j+po[1],0)
+        x,y = wcs_obj.all_pix2world(i,j,0)
     return x,y
 
 def delDist2Grid(v2,v1=0,axis=None):
@@ -195,14 +184,12 @@ def delDist2Grid(v2,v1=0,axis=None):
     elif axis == 'y':
         return int((v2-v1)/float(dy))
 
-def inside_check(v1,v2,po=None,wcs_obj=None):
+def inside_check(v1,v2,wcs_obj=None):
     """
     Checks if coordinates (RA,Dec) are inside of coverage
     map given by wcs_obj.
     Returns False if not inside coverage map.
     """
-    if po is None:
-        po = pixel_origin
         
     if wcs_obj is None:
         wcs_obj = w_obj
@@ -210,7 +197,7 @@ def inside_check(v1,v2,po=None,wcs_obj=None):
         cdec,cra = wcs_obj.all_world2pix(v2,v1,0)
     else:
         cra,cdec = wcs_obj.all_world2pix(v1,v2,0)
-    if  po[0] <= cra < po[0]+ra_axis and po[1] <= cdec < po[1]+dec_axis:
+    if  0 <= round(cra) < ra_axis and 0 <= round(cdec) < dec_axis:
         return True
     else:
         return False
@@ -239,20 +226,15 @@ def circle(xp,yp,R,grid=None,relative=False):
     elif relative == True:
         return np.array([co_x,co_y])-np.array([xg,yg]).reshape(2,1)
     
-def yso_to_grid(yso,po=None,grid=None,yso_return=False):
+def yso_to_grid(yso,grid=None,yso_return=False):
     """
     Make a new grid to place YSOs into using grid as a mask
     and basis of next grid.
     yso should by a 2xN array containing x and y values.
 
-    po = pixel_origin defines the conversion of grid i,j values in the coverage map
-    to the i,j values of an extracted portion of the coverage map.
-
     Optional yso_return function. Returns yso coordinates
     that were inside coverage map.
     """
-    if po is None:
-        po = pixel_origin
         
     #Check yso_return is boolean
     if not type(yso_return) == bool:
@@ -268,7 +250,7 @@ def yso_to_grid(yso,po=None,grid=None,yso_return=False):
     N = np.shape(yso)[1]
     fail_count = 0
     for i in range(N):
-        x,y = xy2grid(yso[0,i],yso[1,i],po)
+        x,y = xy2grid(yso[0,i],yso[1,i])
         if x is None or y is None:
              fail_count += 1
              continue
@@ -276,7 +258,7 @@ def yso_to_grid(yso,po=None,grid=None,yso_return=False):
         if yso_return == True:
             filtered_ysos[0].append(yso[0,i])
             filtered_ysos[1].append(yso[1,i])
-        yso_map[xy2grid(yso[0,i],yso[1,i],po)] += 1
+        yso_map[xy2grid(yso[0,i],yso[1,i])] += 1
 
     if fail_count > 0:
         print('{:d} YSOs failed to position'.format(fail_count))
@@ -286,7 +268,7 @@ def yso_to_grid(yso,po=None,grid=None,yso_return=False):
     elif yso_return == False:
         return yso_map*grid
     
-def random_ysos(val,mode='binomial',po=None,grid=None):
+def random_ysos(val,mode='binomial',grid=None):
     """
     Function to populate a grid with random YSOs. YSOs can be placed anywhere
     with grid == 1.
@@ -297,8 +279,6 @@ def random_ysos(val,mode='binomial',po=None,grid=None):
     Both return the coordinates of the ysos and the completed grid.
     Assumes a uniform probability across the coverage map.
     """
-    if po is None:
-        po = pixel_origin
         
     if grid is None:
         grid = coverage
@@ -320,27 +300,51 @@ def random_ysos(val,mode='binomial',po=None,grid=None):
 
             if Nyso > 0:
                 if inverted:
-                    y,x = w_obj.all_pix2world(po[1]+rnd.rand(Nyso)+j,po[0]+rnd.rand(Nyso)+i,0)
+                    y,x = w_obj.all_pix2world(rnd.rand(Nyso)+j-0.5,rnd.rand(Nyso)+i-0.5,0)
                 else:
-                    x,y = w_obj.all_pix2world(po[0]+rnd.rand(Nyso)+i,po[1]+rnd.rand(Nyso)+j,0)
+                    x,y = w_obj.all_pix2world(rnd.rand(Nyso)+i-0.5,rnd.rand(Nyso)+j-0.5,0)
 
                 yso_x = np.append(yso_x,x)
                 yso_y = np.append(yso_y,y)
             
         return np.vstack([yso_x,yso_y]), yso_map
     
-    elif mode == 'binomial':
+    if mode == 'binomial':
         while np.sum(yso_map) < val:
             rand_pixel = rnd.randint(0,n_pixels)
             i,j = inside_pixels[0,rand_pixel], inside_pixels[1,rand_pixel]
             yso_map[i,j] += 1
             if inverted:
-                y,x = w_obj.all_pix2world(po[1]+rnd.rand()+j,po[0]+rnd.rand()+i,0)
+                y,x = w_obj.all_pix2world(rnd.rand()+j-0.5,rnd.rand()+i-0.5,0)
             else:
-                x,y = w_obj.all_pix2world(po[0]+rnd.rand()+i,po[1]+rnd.rand()+j,0)
+                x,y = w_obj.all_pix2world(rnd.rand()+i-0.5,rnd.rand()+j-0.5,0)
             yso_x = np.append(yso_x,x)
             yso_y = np.append(yso_y,y)
             
+        return np.vstack([yso_x,yso_y]), yso_map
+
+    elif mode == 'sphere_binomial':    
+        #Use sphere point picking to place ysos into coverage map using angles
+        while np.sum(yso_map) < val:
+            #Repeat until desired number of ysos have been added to the map
+            d2r = lambda x: x*np.pi/180
+            n_yso = val-int(np.sum(yso_map))
+            x = (np.max(gx)-np.min(gx))*rnd.rand(val)+np.min(gx)
+            
+            r_theta = rnd.rand(val-int(np.sum(yso_map)))
+            vmin = 0.5*(np.cos(np.pi/2-d2r(np.min(gy)))+1)
+            vmax = 0.5*(np.cos(np.pi/2-d2r(np.max(gy)))+1)
+            del_v = vmax-vmin
+            V = del_v*r_theta+vmin
+            y = 90-180/np.pi*np.arccos(2*V-1)
+
+            for i in range(n_yso):
+                if inside_check(x[i],y[i]):
+                    if grid[xy2grid(x[i],y[i])] == 1:
+                        yso_map[xy2grid(x[i],y[i])] += 1
+                        yso_x = np.append(yso_x,x[i])
+                        yso_y = np.append(yso_y,y[i])
+
         return np.vstack([yso_x,yso_y]), yso_map
 
 def one_kfunc(x1,y1,t,yso_map,grid):
@@ -728,15 +732,13 @@ def get_area_array(tan=True,grid=None):
         #celestial steradians for all pixels
         return angle_part*(dRA*dDec)/(np.cos(theta)**2)
 
-def angle2box(xp,yp,t,po=None):
+def angle2box(xp,yp,t):
     """
     Calculate a VERY conservative estimate of the grid squares
     that cover an angular distance t.
     Returns the i and j values of bottom left and top right
     corners.
     """
-    if po is None:
-        po = pixel_origin
         
     t = np.sqrt(2)*t
     if inverted:
@@ -753,22 +755,94 @@ def angle2box(xp,yp,t,po=None):
         il,jl = w_obj.all_world2pix(xp-t,yp-t,0)
         ir,jr = w_obj.all_world2pix(xp+t,yp+t,0)
 
-    if jl < po[1]:
-        jl = po[1]
-    if il < po[0]:
-        il = po[0]
-    if ir > po[0]+ra_axis:
-        ir = po[0]+ra_axis
-    if jr > po[1]+dec_axis:
-        jr = po[1]+dec_axis
+    if jl < 0:
+        jl = 0
+    if il < 0:
+        il = 0
+    if ir > ra_axis:
+        ir = ra_axis
+    if jr > dec_axis:
+        jr = dec_axis
 
-    return int(il-po[0]),int(ir-po[0]),int(jl-po[1]),int(jr-po[1])
+    return int(round(il)),int(round(ir)),int(round(jl)),int(round(jr))
 
 def collate(results):
     array = np.empty([4,LOOPS,len(r)])
     for i in range(LOOPS):
         array[:,i,:] = np.array(results[i].get())
     return array
+
+def run_csr(val,r,w,mode='sphere_binomial',noP=None,grid=None):
+    """
+    Perform desired number of runs get Oring and Kfunc data for CSR envelopes.
+    r is array of radial distances
+    w is either single value or array of bin widths
+    noP is number of desired workers to parallelise Oring and K seperately.
+    (not recommended)
+    """
+    #if values not specified take global values
+    if grid is None:
+        grid = coverage
+
+    #randomise seed
+    rnd.rand()
+
+    yso,yso_map = random_ysos(val,mode,grid)
+    steps = len(r)
+    results = np.empty((2,steps))
+    for i,t in enumerate(r):
+        ##Oring
+        if type(w) == np.ndarray:
+            w_i = w[i]
+        else:
+            w_i = w
+        o,oo = Oring(yso[0,:],yso[1,:],t,w_i,yso_map,grid,noP)
+        results[0,i] = oo
+        k,kk = kfunc(yso[0,:],yso[1,:],t,yso_map,grid,noP)
+        results[1,i] = kk
+    
+    return results
+
+def allenv(val,r,w,LOOPS,mode='sphere_binomial',noP=None,grid=None):
+    """
+    perform the LOOPS number of realisations using multiprocessing 
+    for increased speed producing results which can then be processed 
+    into confidence envelopes for csr.
+    """
+    if grid is None:
+        grid = coverage
+        
+    if noP > 1:
+        #initialise multiprocessing pool with desired number of processes
+        pool = mp.Pool(noP)
+        results = []
+        for loop in range(LOOPS):
+            results.append(pool.apply_async(run_csr,(val,r,w,mode,None,grid),callback=callbackTimer))
+
+        final_results = np.empty((2,LOOPS,len(r)))
+        for loop in range(LOOPS):
+            final_results[:,loop,:] = results[loop].get()
+    elif noP == 1 or noP == None:
+        start = time.time()
+        final_results = np.empty((2,LOOPS,len(r)))
+        for loop in range(LOOPS):
+            final_results[:,loop,:] = run_csr(val,r,w,mode,None,grid)
+
+            #estimate the time left for code to run
+            completed = loop/float(LOOPS)*100
+            est = (time.time()-start)/(60.0*loop) * (LOOPS-loop) 
+            print('%f%% complete: ~ %f more minutes' %(completed,est))
+    return final_results
+
+
+#time length of project and estimate completion time
+A = []
+def callbackTimer(x):
+    toc = time.time() - tic
+    A.append(toc)
+    completed = len(A)/float(LOOPS)*100
+    est = toc/(60.0*len(A)) * (LOOPS-len(A)) #estimates the time left for code to run
+    print('%f%% complete: ~ %f more minutes' %(completed,est))
 
 """
 Extract the relevant data from the fits file. 
@@ -781,6 +855,7 @@ Coverage map.
 
 fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
 #fits_path = '../SFR_data'
+#fits_path = '.'
 fits_name = 'SERAQU_IRAC1234M1_cov_sm.fits'
 coverage,header = fits.getdata(os.path.join(fits_path,fits_name), header=True)
 w_obj = wcs.WCS(header)
@@ -801,24 +876,58 @@ else:
 
 ##Extracting sections of map
 #desired sector of sky bottom-left and top-right.
+
+def extract_region(bounds,wcs_obj,grid):
+    """
+    Extract rectangular section of coverage map designated by ra and dec coordinates.
+    bounds = (2x2) array containing the boundaries of the desired section. [[Ra_0,Ra_1],[Dec_0,Dec_1]]
+    grid = array to be sliced using pixel coordinates given by wcs_obj.
+    """
+    #coordinates of bottom-left and top-right corners of RA, Dec box.
+    bl = (bounds[0,0],bounds[1,0])
+    tr = (bounds[0,1],bounds[1,1])
+    
+    tl,br = (bl[0],tr[1]),(tr[0],bl[1])
+    if inverted:
+        dec_box,ra_box = w_obj.all_world2pix(np.array([bl[1],br[1],tl[1],tr[1]]),np.array([bl[0],br[0],tl[0],tr[0]]),0)
+    else:
+        ra_box,dec_box = w_obj.all_world2pix(np.array([bl[0],br[0],tl[0],tr[0]]),np.array([bl[1],br[1],tl[1],tr[1]]),0)
+        
+    dec_box = np.round(dec_box)
+    ra_box = np.round(ra_box)
+    ra_lims,dec_lims = (np.min(ra_box),np.max(ra_box)),(np.min(dec_box),np.max(dec_box))
+
+    #slice map and wcs_object
+    grid = grid[int(ra_lims[0]):int(ra_lims[1]),int(dec_lims[0]):int(dec_lims[1])]
+    wcs_obj = wcs_obj[int(ra_lims[0]):int(ra_lims[1]),int(dec_lims[0]):int(dec_lims[1])]
+
+    ##Getting celestial coordinates of pixel centres for extraction
+    axes = np.shape(grid)
+    gx = np.arange(axes[0])
+    gy = np.arange(axes[1])
+    GX,GY = np.meshgrid(gx,gy,indexing='ij')
+    GX,GY = GX.flatten(), GY.flatten()
+    
+    if inverted:
+        gy,gx = wcs_obj.all_pix2world(GY,GX,0)
+    else:
+        gx,gy = wcs_obj.all_pix2world(GX,GY,0)
+
+    gx, gy = gx.reshape(axes[0],axes[1]), gy.reshape(axes[0],axes[1])    
+    remove_extra_coverage = np.where( (gx < bl[0]) | (gx > tr[0]) | (gy < bl[1]) | (gy > tr[1]))
+    grid[remove_extra_coverage] = False
+    return wcs_obj,grid
+
 bl = (277.2,-2.25)
 tr = (277.7,-1.75)
+bounds = np.array([[277.2,277.7],[-2.25,-1.75]])
 
-tl,br = (bl[0],tr[1]),(tr[0],bl[1])
-dec_box,ra_box = w_obj.all_world2pix(np.array([bl[1],br[1],tl[1],tr[1]]),np.array([bl[0],br[0],tl[0],tr[0]]),0)
-dec_box = np.round(dec_box)
-ra_box = np.round(ra_box)
-ra_lims,dec_lims = (np.min(ra_box),np.max(ra_box)),(np.min(dec_box),np.max(dec_box))
-
-##pixel_origin defines where the ra and dec of pixel centres begin for
-#extracted section of map in terms of .
-pixel_origin = (int(ra_lims[0]),int(dec_lims[0]))
-coverage = coverage[int(ra_lims[0]):int(ra_lims[1]),int(dec_lims[0]):int(dec_lims[1])]
+#  w_obj,coverage = extract_region(bounds,w_obj,coverage)
 
 #Remove non-binary values from coverage map
-#cov2 = np.zeros(np.shape(coverage))
-cov2 = np.ones(np.shape(coverage))
-#cov2 += coverage == 1
+cov2 = np.zeros(np.shape(coverage))
+#cov2 = np.ones(np.shape(coverage))
+cov2 += coverage == 1
 
 coverage = cov2.astype(bool)
 cov2 = None
@@ -827,15 +936,12 @@ ra_axis,dec_axis = np.shape(coverage)
 
 ##Getting celestial coordinates of pixel centres
 #
-gx = np.arange(ra_lims[0],ra_lims[1])
-gy = np.arange(dec_lims[0],dec_lims[1])
+gx = np.arange(ra_axis)
+gy = np.arange(dec_axis)
 GX,GY = np.meshgrid(gx,gy,indexing='ij')
 GX,GY = GX.flatten(), GY.flatten()
 gy,gx = w_obj.all_pix2world(GY,GX,0)
 gx, gy = gx.reshape(ra_axis,dec_axis), gy.reshape(ra_axis,dec_axis)
-
-remove_extra_coverage = np.where( (gx < bl[0]) | (gx > tr[0]) | (gy < bl[1]) | (gy > tr[1]))
-coverage[remove_extra_coverage] = False
 
 ##Clear GX and GY from memory
 GX, GY = None, None
@@ -845,58 +951,33 @@ area_array = get_area_array()
 total_area = np.sum(area_array)
 
 ##Getting ysos
-dfile = '/Users/bretter/Documents/StarFormation/SFR_data/serpens_south_yso.txt'
-data = np.loadtxt(dfile,skiprows=1,usecols=(2,3))
-yso = data.T
-val = 50
-#yso,yso_map = random_ysos(val,mode='binomial',grid=coverage)
-#po = pixel_origin
-#ysox,ysoy = w_obj.all_pix2world(np.array([5,10])+po[1],np.array([5,10])+po[0],0)
-#yso = np.array([[276.5,277],[-3,-3]])
-yso_map = yso_to_grid(yso)
-print(np.shape(coverage))
-
+#dfile = 'serpens_south_yso.txt'
+#data = np.loadtxt(dfile,skiprows=1,usecols=(2,3))
+#yso = data.T
+#yso_map = yso_to_grid(yso)
 ##Decide number of processes
-noProcesses = 1
+noProcesses = 4
 
-steps = 3
-r = np.linspace(0.1,0.25,3)
+steps = 20
+r = np.linspace(0.1,0.25,steps)
 w = 0.05
 
-results = np.empty((4,steps))
-#for i,t in enumerate(r):
-    ##Oring
-    #o,oo = Oring(yso[0,:],yso[1,:],t,w)
-    #results[0,i] = oo
-    #o,oo = Oring(yso[0,:],yso[1,:],t,w,noP=1)
-    #results[1,i] = oo
-    #k,kk = kfunc(yso[0,:],yso[1,:],t)
-    #results[2,i] = kk
-    #k,kk = kfunc(yso[0,:],yso[1,:],t,noP=1)
-    #results[3,i] = kk
-
-
-plt.figure()
-plt.plot(r,results[0,:],'b')
-plt.plot(r,results[1,:],'r')
-plt.xlabel('r')
-plt.ylabel('Oring')
-plt.title('Oring')
-
-
-plt.figure()
-plt.plot(r,results[2,:],'b')
-plt.plot(r,results[3,:],'r')
-plt.xlabel('r (angle)')
-plt.ylabel('L')
-plt.title("L")
-
-plt.figure()
-plt.pcolormesh(gx,gy,yso_map)
-plt.plot(yso[0,:],yso[1,:],'*')
-#plt.plot((bl[0],tl[0],tr[0],br[0],bl[0]),(bl[1],tl[1],tr[1],br[1],bl[1]),'r')
-
+plt.pcolormesh(gx,gy,coverage)
 plt.show()
+
+#results = np.empty((2,steps))
+#for i,t in enumerate(r):
+#    ##Oring
+#    o,oo = Oring(yso[0,:],yso[1,:],t,w,yso_map,coverage,noProcesses)
+#    results[0,i] = oo
+#    k,kk = kfunc(yso[0,:],yso[1,:],t,yso_map,coverage,noProcesses)
+#    results[1,i] = kk
+#    
+#    tic = time.time()
+#    print(i)
+#    print((time.time()-tic)/60)
+#np.save('serpens_grid_stats',results)
+
 
 
 
