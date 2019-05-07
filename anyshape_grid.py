@@ -834,6 +834,46 @@ def allenv(val,r,w,LOOPS,mode='sphere_binomial',noP=None,grid=None):
             print('%f%% complete: ~ %f more minutes' %(completed,est))
     return final_results
 
+def extract_region(bounds,wcs_obj,grid):
+    """
+    Extract rectangular section of coverage map designated by ra and dec coordinates.
+    bounds = (2x2) array containing the boundaries of the desired section. [[Ra_0,Ra_1],[Dec_0,Dec_1]]
+    grid = array to be sliced using pixel coordinates given by wcs_obj.
+    """
+    #coordinates of bottom-left and top-right corners of RA, Dec box.
+    bl = (bounds[0,0],bounds[1,0])
+    tr = (bounds[0,1],bounds[1,1])
+    
+    tl,br = (bl[0],tr[1]),(tr[0],bl[1])
+    if inverted:
+        dec_box,ra_box = w_obj.all_world2pix(np.array([bl[1],br[1],tl[1],tr[1]]),np.array([bl[0],br[0],tl[0],tr[0]]),0)
+    else:
+        ra_box,dec_box = w_obj.all_world2pix(np.array([bl[0],br[0],tl[0],tr[0]]),np.array([bl[1],br[1],tl[1],tr[1]]),0)
+        
+    dec_box = np.round(dec_box)
+    ra_box = np.round(ra_box)
+    ra_lims,dec_lims = (np.min(ra_box),np.max(ra_box)),(np.min(dec_box),np.max(dec_box))
+
+    #slice map and wcs_object
+    grid = grid[int(ra_lims[0]):int(ra_lims[1]),int(dec_lims[0]):int(dec_lims[1])]
+    wcs_obj = wcs_obj[int(ra_lims[0]):int(ra_lims[1]),int(dec_lims[0]):int(dec_lims[1])]
+
+    ##Getting celestial coordinates of pixel centres for extraction
+    axes = np.shape(grid)
+    gx = np.arange(axes[0])
+    gy = np.arange(axes[1])
+    GX,GY = np.meshgrid(gx,gy,indexing='ij')
+    GX,GY = GX.flatten(), GY.flatten()
+    
+    if inverted:
+        gy,gx = wcs_obj.all_pix2world(GY,GX,0)
+    else:
+        gx,gy = wcs_obj.all_pix2world(GX,GY,0)
+
+    gx, gy = gx.reshape(axes[0],axes[1]), gy.reshape(axes[0],axes[1])    
+    remove_extra_coverage = np.where( (gx < bl[0]) | (gx > tr[0]) | (gy < bl[1]) | (gy > tr[1]))
+    grid[remove_extra_coverage] = False
+    return wcs_obj,grid
 
 #time length of project and estimate completion time
 A = []
@@ -876,47 +916,6 @@ else:
 
 ##Extracting sections of map
 #desired sector of sky bottom-left and top-right.
-
-def extract_region(bounds,wcs_obj,grid):
-    """
-    Extract rectangular section of coverage map designated by ra and dec coordinates.
-    bounds = (2x2) array containing the boundaries of the desired section. [[Ra_0,Ra_1],[Dec_0,Dec_1]]
-    grid = array to be sliced using pixel coordinates given by wcs_obj.
-    """
-    #coordinates of bottom-left and top-right corners of RA, Dec box.
-    bl = (bounds[0,0],bounds[1,0])
-    tr = (bounds[0,1],bounds[1,1])
-    
-    tl,br = (bl[0],tr[1]),(tr[0],bl[1])
-    if inverted:
-        dec_box,ra_box = w_obj.all_world2pix(np.array([bl[1],br[1],tl[1],tr[1]]),np.array([bl[0],br[0],tl[0],tr[0]]),0)
-    else:
-        ra_box,dec_box = w_obj.all_world2pix(np.array([bl[0],br[0],tl[0],tr[0]]),np.array([bl[1],br[1],tl[1],tr[1]]),0)
-        
-    dec_box = np.round(dec_box)
-    ra_box = np.round(ra_box)
-    ra_lims,dec_lims = (np.min(ra_box),np.max(ra_box)),(np.min(dec_box),np.max(dec_box))
-
-    #slice map and wcs_object
-    grid = grid[int(ra_lims[0]):int(ra_lims[1]),int(dec_lims[0]):int(dec_lims[1])]
-    wcs_obj = wcs_obj[int(ra_lims[0]):int(ra_lims[1]),int(dec_lims[0]):int(dec_lims[1])]
-
-    ##Getting celestial coordinates of pixel centres for extraction
-    axes = np.shape(grid)
-    gx = np.arange(axes[0])
-    gy = np.arange(axes[1])
-    GX,GY = np.meshgrid(gx,gy,indexing='ij')
-    GX,GY = GX.flatten(), GY.flatten()
-    
-    if inverted:
-        gy,gx = wcs_obj.all_pix2world(GY,GX,0)
-    else:
-        gx,gy = wcs_obj.all_pix2world(GX,GY,0)
-
-    gx, gy = gx.reshape(axes[0],axes[1]), gy.reshape(axes[0],axes[1])    
-    remove_extra_coverage = np.where( (gx < bl[0]) | (gx > tr[0]) | (gy < bl[1]) | (gy > tr[1]))
-    grid[remove_extra_coverage] = False
-    return wcs_obj,grid
 
 bl = (277.2,-2.25)
 tr = (277.7,-1.75)
