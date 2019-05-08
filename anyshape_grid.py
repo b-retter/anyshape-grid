@@ -9,6 +9,7 @@ import sys
 import os
 from astropy.io import fits
 from astropy import wcs
+from scipy.special import factorial
 
 #/Users/bretter/Documents/StarFormation/RandomDistribution/spatialStats/Functions
 #sys.path.append('/Users/bretter/Documents/StarFormation/RandomDistribution/spatialStats/Functions')
@@ -884,6 +885,71 @@ def callbackTimer(x):
     est = toc/(60.0*len(A)) * (LOOPS-len(A)) #estimates the time left for code to run
     print('%f%% complete: ~ %f more minutes' %(completed,est))
 
+def reduce_map(grid,yso_map,L,p0,yso_return=False):
+    """
+    uses a square window with side length L to remove sections of grid that 
+    contain too few YSOs.
+    The minimum number of ysos is specified by p0 using the method by 
+    Wiegand et al 2004.
+    Optional yso_return argument for when ysos have been excluded due to 
+    coverage map being reduced.
+    """
+    def get_k(lmda,w,p0):
+        """
+        Find kmin assuming Poisson distribution of yso counts in areas.
+        """
+        Pk = lambda x,y: x**y*np.exp(-x)/factorial(y)
+        k=-1
+        p=0
+        while p < p0:
+            k+=1
+            p+=Pk(lmda*w,k)
+            
+        return k
+
+    shape = np.shape(grid)
+    #estimate first-order intensity
+    lmda = np.sum(yso_map)/get_area()
+    half_width = int(round(L/2))
+
+    #check preliminary k:
+    w = np.sum(area_array[:L,:L])
+    k=get_k(lmda,w,p0)
+    if k == 0:
+        print('K_min too low, no regions reduced.')
+        return coverage
+
+    for i in range(shape[0]):
+
+        if i - half_width < 0:
+            i0 = 0
+        else:
+            i0 = i-half_width
+        if i + half_width >= shape[0]:
+            i1 = shape[0]
+        else:
+            i1 = i+half_width
+
+        for j in range(shape[1]):
+            if j - half_width < 0:
+                j0 = 0
+            else:
+                j0 = j-half_width
+            if j + half_width >= shape[1]:
+                j1 = shape[1]
+            else:
+                j1 = j+half_width
+
+            w = np.sum(area_array[i0:i1,j0:j1])
+            k=get_k(lmda,w,p0)
+            if np.sum(yso_map[i0:i1,j0:j1]) < k:
+                grid[i,j] = 0
+    if yso_return == False:
+        return grid
+    else:
+        return grid, yso_map*grid
+        
+
 """
 Extract the relevant data from the fits file. 
 Array size.
@@ -893,7 +959,7 @@ Array of grid centre coordinates.
 Coverage map.
 """
 
-#fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
+fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
 #fits_path = '../SFR_data'
 #fits_path = '.'
 fits_name = 'SERAQU_IRAC1234M1_cov_sm.fits'
@@ -921,7 +987,7 @@ bl = (277.2,-2.25)
 tr = (277.7,-1.75)
 bounds = np.array([[277.2,277.7],[-2.25,-1.75]])
 
-#  w_obj,coverage = extract_region(bounds,w_obj,coverage)
+w_obj,coverage = extract_region(bounds,w_obj,coverage)
 
 #Remove non-binary values from coverage map
 cov2 = np.zeros(np.shape(coverage))
@@ -950,29 +1016,19 @@ area_array = get_area_array()
 total_area = np.sum(area_array)
 
 ##Getting ysos
-#dfile = 'serpens_south_yso.txt'
-#data = np.loadtxt(dfile,skiprows=1,usecols=(2,3))
-#yso = data.T
-#yso_map = yso_to_grid(yso)
-##Decide number of processes
-noProcesses = 4
+dfile = '../serpens_south_yso.txt'
+data = np.loadtxt(dfile,skiprows=1,usecols=(2,3))
+yso = data.T
+yso_map = yso_to_grid(yso)
 
-steps = 20
-r = np.linspace(0.1,0.25,steps)
-w = 0.05
+coverage,yso_map = reduce_map(coverage,yso_map,80,0.05,True)
+#coverage,yso_map = reduce_map(coverage,yso_map,50,0.01,True)
 
-results = np.empty((2,steps))
-for i,t in enumerate(r):
-    ##Oring
-    o,oo = Oring(yso[0,:],yso[1,:],t,w,yso_map,coverage,noProcesses)
-    results[0,i] = oo
-    k,kk = kfunc(yso[0,:],yso[1,:],t,yso_map,coverage,noProcesses)
-    results[1,i] = kk
-    
-    tic = time.time()
-    print(i)
-    print((time.time()-tic)/60)
-np.save('serpens_grid_stats',results)
+plt.figure()
+plt.pcolormesh(gx,gy,coverage)
+plt.plot(yso[0,:],yso[1,:],'*')
+
+plt.show()
 
 
 
