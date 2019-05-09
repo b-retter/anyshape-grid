@@ -910,36 +910,37 @@ def reduce_map(grid,yso_map,L,p0,yso_return=False):
     shape = np.shape(grid)
     #estimate first-order intensity
     lmda = np.sum(yso_map)/get_area()
-    half_width = int(round(L/2))
+    half_width = int(round(L/2.0))
 
     #check preliminary k:
-    w = np.sum(area_array[:L,:L])
-    k=get_k(lmda,w,p0)
-    if k == 0:
-        print('K_min too low, no regions reduced.')
-        return coverage
+    #w = np.sum(area_array[:L,:L])
+    #k=get_k(lmda,w,p0)
+    #if k == 0:
+    #    print('K_min too low, no regions reduced.')
+    #    if yso_return == False:
+    #        return coverage
+    #    else:
+    #        return coverage,yso_map
 
     for i in range(shape[0]):
-
-        if i - half_width < 0:
+        i0 = i-half_width
+        i1 = i+half_width
+        if i0 < 0:
             i0 = 0
-        else:
-            i0 = i-half_width
-        if i + half_width >= shape[0]:
+            i1 = 2*half_width
+        if i1 >= shape[0]:
+            i0 = shape[0]-2*half_width
             i1 = shape[0]
-        else:
-            i1 = i+half_width
-
+            
         for j in range(shape[1]):
-            if j - half_width < 0:
+            j0 = j-half_width
+            j1 = j+half_width       
+            if j0 < 0:
                 j0 = 0
-            else:
-                j0 = j-half_width
-            if j + half_width >= shape[1]:
+                j1 = 2*half_width
+            if j1 >= shape[1]:
+                j0 = shape[1]-2*half_width
                 j1 = shape[1]
-            else:
-                j1 = j+half_width
-
             w = np.sum(area_array[i0:i1,j0:j1])
             k=get_k(lmda,w,p0)
             if np.sum(yso_map[i0:i1,j0:j1]) < k:
@@ -990,9 +991,9 @@ bounds = np.array([[277.2,277.7],[-2.25,-1.75]])
 w_obj,coverage = extract_region(bounds,w_obj,coverage)
 
 #Remove non-binary values from coverage map
-cov2 = np.zeros(np.shape(coverage))
-#cov2 = np.ones(np.shape(coverage))
-cov2 += coverage == 1
+#cov2 = np.zeros(np.shape(coverage))
+cov2 = np.ones(np.shape(coverage))
+#cov2 += coverage == 1
 
 coverage = cov2.astype(bool)
 cov2 = None
@@ -1016,18 +1017,44 @@ area_array = get_area_array()
 total_area = np.sum(area_array)
 
 ##Getting ysos
-dfile = '../serpens_south_yso.txt'
-data = np.loadtxt(dfile,skiprows=1,usecols=(2,3))
-yso = data.T
-yso_map = yso_to_grid(yso)
+#dfile = '../serpens_south_yso.txt'
+#data = np.loadtxt(dfile,skiprows=1,usecols=(2,3))
+#yso = data.T
+#yso_map = yso_to_grid(yso)
 
-coverage,yso_map = reduce_map(coverage,yso_map,80,0.05,True)
-#coverage,yso_map = reduce_map(coverage,yso_map,50,0.01,True)
+coords = circle(277.45,-2,0.2)
+coverage = coverage*0
+for i in range(np.shape(coords)[1]):
+    coverage[coords[0,i],coords[1,i]] = 1
+    
+#Getting ysos
+Nyso = 100
+yso,yso_map = random_ysos(Nyso,mode='sphere_binomial')
+
+coverage = np.ones(np.shape(coverage))
+plt.figure()
+plt.pcolormesh(gx,gy,coverage)
+plt.plot(yso[0,:],yso[1,:],'*')
+plt.axis('equal')
+
+coverage,yso_map = reduce_map(coverage,yso_map,80,0.01,True)
+area_array = get_area_array()
+plt.figure()
+plt.pcolormesh(gx,gy,coverage)
+plt.plot(yso[0,:],yso[1,:],'*')
+plt.axis('equal')
+
+p0=0.05
+lmda = np.sum(yso_map)/get_area()
+wmin = -np.log(p0)/lmda
+L_sqrd = wmin/get_area()*np.size(coverage)
+coverage,yso_map = reduce_map(coverage,yso_map,np.sqrt(L_sqrd),p0,True)
+area_array = get_area_array()
 
 plt.figure()
 plt.pcolormesh(gx,gy,coverage)
 plt.plot(yso[0,:],yso[1,:],'*')
-
+plt.axis('equal')
 plt.show()
 
 
