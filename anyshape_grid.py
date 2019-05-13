@@ -1016,13 +1016,26 @@ area_array = get_area_array()
 total_area = np.sum(area_array)
 
 ##Getting ysos
-dfile = '../serpens_south_yso.txt'
-data = np.loadtxt(dfile,skiprows=1,usecols=(2,3))
-yso = data.T
+dfile = '../dunham15_tab_ysos_coords.txt'
+data = np.loadtxt(dfile,skiprows=1,usecols=(2,3,8))
+
+#Class limits with corrected alpha 
+#Class 0/I  alpha >= 0.3
+#Flat-spectrum -0.3 <= alpha < 0.3
+#Class II -1.6 <= alpha < - 0.3
+#Class III alpha < -1.6
+
+alpha_mask = data[:,2] >= 0.3
+class_yso = data[alpha_mask,:]
+pos_data = data[:,:2]
+pos_mask = (pos_data[:,0] > bounds[0,0]) & (pos_data[:,0] < bounds[0,1]) & (pos_data[:,1] > bounds[1,0]) & (pos_data[:,1] < bounds[1,1])
+total_mask = pos_mask & alpha_mask
+yso = data[total_mask,:2]
+yso = yso.T
 yso_map = yso_to_grid(yso)
 
-coverage,yso_map = reduce_map(coverage,yso_map,80,0.05,True)
-#coverage,yso_map = reduce_map(coverage,yso_map,50,0.01,True)
+#coverage,yso_map = reduce_map(coverage,yso_map,100,0.05,True)
+#coverage,yso_map = reduce_map(coverage,yso_map,80,0.05,True)
 
 plt.figure()
 plt.pcolormesh(gx,gy,coverage)
