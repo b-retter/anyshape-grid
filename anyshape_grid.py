@@ -885,7 +885,7 @@ def callbackTimer(x):
     est = toc/(60.0*len(A)) * (LOOPS-len(A)) #estimates the time left for code to run
     print('%f%% complete: ~ %f more minutes' %(completed,est))
 
-def reduce_map(grid,yso_map,L,p0,yso_return=False):
+def reduce_map(grid,yso_map,L,p0,tol=1,yso_return=False):
     """
     uses a square window with side length L to remove sections of grid that 
     contain too few YSOs.
@@ -899,12 +899,15 @@ def reduce_map(grid,yso_map,L,p0,yso_return=False):
         Find kmin assuming Poisson distribution of yso counts in areas.
         """
         Pk = lambda x,y: x**y*np.exp(-x)/factorial(y)
+        Pk2 = lambda x,y: np.exp(y*np.log(x)-x-(0.5*np.log(2*np.pi*y)+y*np.log(y/np.exp(1))))
         k=-1
         p=0
         while p < p0:
             k+=1
-            p+=Pk(lmda*w,k)
-            
+            if k < 20:
+                p+=Pk(lmda*w,k)
+            else:
+                p+=Pk2(lmda*w,k)
         return k
 
     shape = np.shape(grid)
@@ -915,22 +918,13 @@ def reduce_map(grid,yso_map,L,p0,yso_return=False):
     #check preliminary k:
     w = float(L**2)/np.sum(grid)*get_area()
     k_min=get_k(lmda,w,p0)
-    print(k_min)
-    #if k == 0:
-    #    print('K_min too low, no regions reduced.')
-    #    if yso_return == False:
-    #        return coverage
-    #    else:
-    #        return coverage,yso_map
 
     for i in range(shape[0]):
         i0 = i-half_width
         i1 = i+half_width
         if i0 < 0:
             i0 = 0
-            #i1 = 2*half_width
         if i1 >= shape[0]:
-            #i0 = shape[0]-2*half_width
             i1 = shape[0]
             
         for j in range(shape[1]):
@@ -942,28 +936,22 @@ def reduce_map(grid,yso_map,L,p0,yso_return=False):
             j1 = j+half_width       
             if j0 < 0:
                 j0 = 0
-                #j1 = 2*half_width
             if j1 >= shape[1]:
-                #j0 = shape[1]-2*half_width
                 j1 = shape[1]
             w = np.sum(area_array[i0:i1,j0:j1])
             k=get_k(lmda,w,p0)
-            while k < k_min:
+            while k < tol:
                 i0 -= 1
                 i1 += 1
                 j0 -= 1
                 j1 += 1
                 if i0 <0:
                     i0 = 0
-                    i1 += 1
                 if i1 > shape[0]:
-                    i0 -=1
                     i1 = shape[0]
                 if j0 < 0:
                     j0 = 0
-                    j1 += 1
                 if j1 > shape[1]:
-                    j0 -= 1
                     j1 = shape[1]
                 
                 w = np.sum(area_array[i0:i1,j0:j1])
@@ -985,44 +973,41 @@ def clean_map(grid,L,p0):
     Optional yso_return argument for when ysos have been excluded due to 
     coverage map being reduced.
     """
-    def get_k(lmda,w,p0):
+    def get_k(lmda,w,p0,k0=0):
         """
         Find kmin assuming Poisson distribution of yso counts in areas.
         """
         Pk = lambda x,y: x**y*np.exp(-x)/factorial(y)
-        k=-1
+        Pk2 = lambda x,y: np.exp(y*np.log(x)-x-(0.5*np.log(2*np.pi*y)+y*np.log(y/np.exp(1))))
+        k= k0-1
         p=0
         while p < p0:
             k+=1
-            p+=Pk(lmda*w,k)
+            if k < 20:
+                p+=Pk(lmda*w,k)
+            else:
+                p+=Pk2(lmda*w,k)
             
         return k
 
     end_grid = np.copy(grid)
     shape = np.shape(grid)
+    
     #estimate first-order intensity
     lmda = float(np.sum(grid))/np.size(grid)
     half_width = int(round(L/2.0))
 
     #check preliminary k:
-    w = float(L**2)
-    k_min=get_k(lmda,w,p0)
-    print(k_min)
-    #if k == 0:
-    #    print('K_min too low, no regions reduced.')
-    #    if yso_return == False:
-    #        return coverage
-    #    else:
-    #        return coverage,yso_map
+    w0 = float(L**2)
+    k_min=get_k(lmda,w0,p0)
+    k=k_min
 
     for i in range(shape[0]):
         i0 = i-half_width
         i1 = i+half_width
         if i0 < 0:
             i0 = 0
-            i1 = 2*half_width
         if i1 >= shape[0]:
-            i0 = shape[0]-2*half_width
             i1 = shape[0]
             
         for j in range(shape[1]):
@@ -1034,13 +1019,18 @@ def clean_map(grid,L,p0):
             j1 = j+half_width       
             if j0 < 0:
                 j0 = 0
-                j1 = 2*half_width
             if j1 >= shape[1]:
-                j0 = shape[1]-2*half_width
                 j1 = shape[1]
 
-            if np.sum(grid[i0:i1,j0:j1]) < k_min:
+            #check if w has changed, if it has recalculate w and k
+            w = np.size(grid[i0:i1,j0:j1])
+            if w != w0:
+                w0=w
+                k = get_k(lmda,w,p0,k0=k_min/4.0)
+            
+            if np.sum(grid[i0:i1,j0:j1]) < k:
                 end_grid[i,j] = 0
+                
     return end_grid
     
 """
@@ -1114,13 +1104,13 @@ total_area = np.sum(area_array)
 #yso = data.T
 #yso_map = yso_to_grid(yso)
 
-coords = circle(277.45,-2,0.3)
+coords = circle(277.45,-2,0.1)
 coverage = coverage*0
 for i in range(np.shape(coords)[1]):
     coverage[coords[0,i],coords[1,i]] = 1
     
 #Getting ysos
-Nyso = 200
+Nyso = 100
 yso,yso_map = random_ysos(Nyso,mode='sphere_binomial')
 
 coverage = np.ones(np.shape(coverage))
@@ -1129,7 +1119,7 @@ plt.pcolormesh(gx,gy,coverage)
 plt.plot(yso[0,:],yso[1,:],'*')
 plt.axis('equal')
 
-coverage,yso_map = reduce_map(coverage,yso_map,90,0.01,True)
+coverage,yso_map = reduce_map(coverage,yso_map,90,0.01,0,True)
 area_array = get_area_array()
 plt.figure()
 plt.pcolormesh(gx,gy,coverage)
@@ -1139,17 +1129,32 @@ plt.axis('equal')
 p0=0.01
 lmda = np.sum(yso_map)/get_area()
 wmin = -np.log(p0)/lmda
-L_sqrd = wmin/get_area()*np.size(coverage)
-coverage,yso_map = reduce_map(coverage,yso_map,np.sqrt(L_sqrd),p0,True)
+L_sqrd = wmin/total_area*np.size(coverage)
+coverage,yso_map = reduce_map(coverage,yso_map,np.sqrt(L_sqrd),p0,1,True)
 area_array = get_area_array()
-
 plt.figure()
 plt.pcolormesh(gx,gy,coverage)
 plt.plot(yso[0,:],yso[1,:],'*')
 plt.axis('equal')
 
+
+coverage = clean_map(coverage,60,p0)
+area_array = get_area_array()
+plt.figure()
+plt.pcolormesh(gx,gy,coverage)
+plt.plot(yso[0,:],yso[1,:],'*')
+plt.axis('equal')
+
+#p0=0.01
+#lmda = np.sum(yso_map)/get_area()
+#wmin = -np.log(p0)/lmda
+#L_sqrd = wmin/get_area()*np.size(coverage)
+#coverage,yso_map = reduce_map(coverage,yso_map,np.sqrt(L_sqrd),p0,True)
+#area_array = get_area_array()
+
+#plt.figure()
+#plt.pcolormesh(gx,gy,coverage)
+#plt.plot(yso[0,:],yso[1,:],'*')
+#plt.axis('equal')
+
 plt.show()
-
-
-
-
