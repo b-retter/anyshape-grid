@@ -1066,11 +1066,9 @@ else:
 ##Extracting sections of map
 #desired sector of sky bottom-left and top-right.
 
-bl = (277.2,-2.25)
-tr = (277.7,-1.75)
-bounds = np.array([[277.2,277.7],[-2.25,-1.75]])
+bounds = np.array([[277.4,277.6],[1.18,1.28]])
 #number of processes
-noProcess = 10
+noProcess = 5
 w_obj,coverage = extract_region(bounds,w_obj,coverage)
 
 #Remove non-binary values from coverage map
@@ -1119,8 +1117,8 @@ alpha_mask = np.array([class01_mask,flat_mask,class2_mask,class3_mask])
 pos_data = data[:,:2]
 pos_mask = (pos_data[:,0] > bounds[0,0]) & (pos_data[:,0] < bounds[0,1]) & (pos_data[:,1] > bounds[1,0]) & (pos_data[:,1] < bounds[1,1])
 
-region = 'serpens_south'
-fpath = '{:s}_reduced/'.format(region)
+region = 'serpens_core'
+fpath = '{:s}/'.format(region)
 class_list = ['classI0','flat','classII','classIII']
 #loop over each yso class
 
@@ -1135,47 +1133,48 @@ for a in range(4):
     yso = yso.T
     yso_map = yso_to_grid(yso)
     
-    #save image of each coverage map
-    plt.figure()
-    plt.pcolormesh(gx,gy,coverage)
-    plt.plot(yso[0,:],yso[1,:],'*')
-    plt.xlabel('RA')
-    plt.ylabel('Dec')
-    plt.title('Non-reduced coverage map for {:s} {:s} YSOs'.format(region,class_list[a]))
-    plt.axis('equal')
-    plt.savefig('{:s}{:s}_{:s}_map.png'.format(fpath,region,class_list[a]))
+    # #save image of each coverage map
+    # plt.figure()
+    # plt.pcolormesh(gx,gy,coverage)
+    # plt.plot(yso[0,:],yso[1,:],'*')
+    # plt.xlabel('RA')
+    # plt.ylabel('Dec')
+    # plt.title('Non-reduced coverage map for {:s} {:s} YSOs'.format(region,class_list[a]))
+    # plt.axis('equal')
+    # plt.savefig('{:s}{:s}_{:s}_map.png'.format(fpath,region,class_list[a]))
 
-    #First pass
-    p0=0.01
-    lmda = np.sum(yso_map)/get_area()
-    wmin = -np.log(p0)/lmda
-    L_sqrd = wmin/total_area*np.size(coverage)
-    L = np.sqrt(L_sqrd)
-    coverage,yso_map = reduce_map(coverage,yso_map,int(1.5*L),p0,0,True)
-    area_array = get_area_array()
+    # #uncomment to perform map reduction
+    # #First pass
+    # p0=0.01
+    # lmda = np.sum(yso_map)/get_area()
+    # wmin = -np.log(p0)/lmda
+    # L_sqrd = wmin/total_area*np.size(coverage)
+    # L = np.sqrt(L_sqrd)
+    # coverage,yso_map = reduce_map(coverage,yso_map,int(1.5*L),p0,0,True)
+    # area_array = get_area_array()
 
-    #Second pass
-    p0=0.01
-    lmda = np.sum(yso_map)/get_area()
-    wmin = -np.log(p0)/lmda
-    L_sqrd = wmin/total_area*np.size(coverage)
-    L = np.sqrt(L_sqrd)
-    coverage,yso_map = reduce_map(coverage,yso_map,L,p0,1,True)
-    area_array = get_area_array()
+    # #Second pass
+    # p0=0.01
+    # lmda = np.sum(yso_map)/get_area()
+    # wmin = -np.log(p0)/lmda
+    # L_sqrd = wmin/total_area*np.size(coverage)
+    # L = np.sqrt(L_sqrd)
+    # coverage,yso_map = reduce_map(coverage,yso_map,L,p0,1,True)
+    # area_array = get_area_array()
 
-    #save image of each reduced coverage map
-    plt.figure()
-    plt.pcolormesh(gx,gy,coverage)
-    plt.plot(yso[0,:],yso[1,:],'*')
-    plt.xlabel('RA')
-    plt.ylabel('Dec')
-    plt.title('Reduced coverage map for {:s} {:s} YSOs'.format(region,class_list[a]))
-    plt.axis('equal')
-    plt.savefig('{:s}{:s}_{:s}_reduced_map.png'.format(fpath,region,class_list[a]))
+    # #save image of each reduced coverage map
+    # plt.figure()
+    # plt.pcolormesh(gx,gy,coverage)
+    # plt.plot(yso[0,:],yso[1,:],'*')
+    # plt.xlabel('RA')
+    # plt.ylabel('Dec')
+    # plt.title('Reduced coverage map for {:s} {:s} YSOs'.format(region,class_list[a]))
+    # plt.axis('equal')
+    # plt.savefig('{:s}{:s}_{:s}_reduced_map.png'.format(fpath,region,class_list[a]))
     
     #Get stats
     steps = 20
-    r = np.linspace(0.01,0.25,steps)
+    r = np.linspace(0.001,0.05,steps)
     w = r*0.6
 
     results = np.empty((2,steps))
@@ -1193,8 +1192,8 @@ for a in range(4):
         est = (toc-tic)/(60.0*cur) * (4*steps-cur) #estimates the time left for code to run
         print('%f%% complete: ~ %f more minutes' %(completed,est))
 
-    np.save('{:s}{:s}_{:s}_reduced_stats'.format(fpath,region,class_list[a]),results)
-    np.save('{:s}{:s}_{:s}_reduced_map'.format(fpath,region,class_list[a]),coverage)
+    np.save('{:s}{:s}_{:s}_stats'.format(fpath,region,class_list[a]),results)
+    np.save('{:s}{:s}_{:s}_map'.format(fpath,region,class_list[a]),coverage)
     
 #coverage = clean_map(coverage,60,p0)
 #area_array = get_area_array()
@@ -1215,4 +1214,4 @@ for a in range(4):
 #plt.plot(yso[0,:],yso[1,:],'*')
 #plt.axis('equal')
 
-plt.show()
+#plt.show()
