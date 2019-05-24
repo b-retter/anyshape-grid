@@ -1042,9 +1042,9 @@ Array of grid centre coordinates.
 Coverage map.
 """
 
-fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
+#fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
 #fits_path = '../SFR_data'
-#fits_path = '.'
+fits_path = '.'
 fits_name = 'SERAQU_IRAC1234M1_cov_sm.fits'
 coverage,header = fits.getdata(os.path.join(fits_path,fits_name), header=True)
 w_obj = wcs.WCS(header)
@@ -1069,16 +1069,17 @@ else:
 bl = (277.2,-2.25)
 tr = (277.7,-1.75)
 bounds = np.array([[277.2,277.7],[-2.25,-1.75]])
-
+#number of processes
+noProcess = 3
 w_obj,coverage = extract_region(bounds,w_obj,coverage)
 
 #Remove non-binary values from coverage map
-#cov2 = np.zeros(np.shape(coverage))
-cov2 = np.ones(np.shape(coverage))
-#cov2 += coverage == 1
+cov = np.zeros(np.shape(coverage))
+#cov2 = np.ones(np.shape(coverage))
+cov += coverage == 1
 
-coverage = cov2.astype(bool)
-cov2 = None
+coverage = cov.astype(bool)
+#cov2 = None
 
 ra_axis,dec_axis = np.shape(coverage)
 
@@ -1099,7 +1100,7 @@ area_array = get_area_array()
 total_area = np.sum(area_array)
 
 ##Getting ysos
-dfile = '../dunham15_tab_ysos_coords.txt'
+dfile = 'dunham15_tab_ysos_coords.txt'
 data = np.loadtxt(dfile,skiprows=1,usecols=(2,3,8))
 
 #Class limits with corrected alpha 
@@ -1108,43 +1109,99 @@ data = np.loadtxt(dfile,skiprows=1,usecols=(2,3,8))
 #Class II -1.6 <= alpha < - 0.3
 #Class III alpha < -1.6
 
-alpha_mask = data[:,2] >= 0.3
-class_yso = data[alpha_mask,:]
+#combine class masks into one 3d array
+class01_mask = data[:,2] >= 0.3
+flat_mask = (-0.3 <= data[:,2]) & (data[:,2] < 0.3)
+class2_mask = (-1.6 <= data[:,2]) & (data[:,2] < -0.3)
+class3_mask = data[:,2] < -1.6
+
+alpha_mask = np.array([class01_mask,flat_mask,class2_mask,class3_mask])
 pos_data = data[:,:2]
 pos_mask = (pos_data[:,0] > bounds[0,0]) & (pos_data[:,0] < bounds[0,1]) & (pos_data[:,1] > bounds[1,0]) & (pos_data[:,1] < bounds[1,1])
-total_mask = pos_mask & alpha_mask
-yso = data[total_mask,:2]
-yso = yso.T
-yso_map = yso_to_grid(yso)
 
-#coverage,yso_map = reduce_map(coverage,yso_map,100,0.05,True)
-#coverage,yso_map = reduce_map(coverage,yso_map,80,0.05,True)
+region = 'serpens_south'
+fpath = '{:s}_reduced/'.format(region)
+class_list = ['classI0','flat','classII','classIII']
+#loop over each yso class
 
-coverage,yso_map = reduce_map(coverage,yso_map,90,0.01,0,True)
-area_array = get_area_array()
-plt.figure()
-plt.pcolormesh(gx,gy,coverage)
-plt.plot(yso[0,:],yso[1,:],'*')
-plt.axis('equal')
+tic = time.time()
+for a in range(4):
+    #reset coverage map for each yso class
+    coverage = cov.astype(bool)
+    area_array = get_area_array()
+    
+    total_mask = pos_mask & alpha_mask[a]
+    yso = data[total_mask,:2]
+    yso = yso.T
+    yso_map = yso_to_grid(yso)
+    
+    #save image of each coverage map
+    plt.figure()
+    plt.pcolormesh(gx,gy,coverage)
+    plt.plot(yso[0,:],yso[1,:],'*')
+    plt.xlabel('RA')
+    plt.ylabel('Dec')
+    plt.title('Non-reduced coverage map for {:s} {:s} YSOs'.format(region,class_list[a]))
+    plt.axis('equal')
+    plt.savefig('{:s}{:s}_{:s}_map.png'.format(fpath,region,class_list[a]))
 
-p0=0.01
-lmda = np.sum(yso_map)/get_area()
-wmin = -np.log(p0)/lmda
-L_sqrd = wmin/total_area*np.size(coverage)
-coverage,yso_map = reduce_map(coverage,yso_map,np.sqrt(L_sqrd),p0,1,True)
-area_array = get_area_array()
-plt.figure()
-plt.pcolormesh(gx,gy,coverage)
-plt.plot(yso[0,:],yso[1,:],'*')
-plt.axis('equal')
+    #First pass
+    p0=0.01
+    lmda = np.sum(yso_map)/get_area()
+    wmin = -np.log(p0)/lmda
+    L_sqrd = wmin/total_area*np.size(coverage)
+    L = np.sqrt(L_sqrd)
+    coverage,yso_map = reduce_map(coverage,yso_map,int(1.5*L),p0,0,True)
+    area_array = get_area_array()
 
+    #Second pass
+    p0=0.01
+    lmda = np.sum(yso_map)/get_area()
+    wmin = -np.log(p0)/lmda
+    L_sqrd = wmin/total_area*np.size(coverage)
+    L = np.sqrt(L_sqrd)
+    coverage,yso_map = reduce_map(coverage,yso_map,L,p0,1,True)
+    area_array = get_area_array()
 
-coverage = clean_map(coverage,60,p0)
-area_array = get_area_array()
-plt.figure()
-plt.pcolormesh(gx,gy,coverage)
-plt.plot(yso[0,:],yso[1,:],'*')
-plt.axis('equal')
+    #save image of each reduced coverage map
+    plt.figure()
+    plt.pcolormesh(gx,gy,coverage)
+    plt.plot(yso[0,:],yso[1,:],'*')
+    plt.xlabel('RA')
+    plt.ylabel('Dec')
+    plt.title('Reduced coverage map for {:s} {:s} YSOs'.format(region,class_list[a]))
+    plt.axis('equal')
+    plt.savefig('{:s}{:s}_{:s}_reduced_map.png'.format(fpath,region,class_list[a]))
+    
+    #Get stats
+    steps = 20
+    r = np.linspace(0.01,0.25,steps)
+    w = r*0.6
+
+    results = np.empty((2,steps))
+    for i,v in enumerate(r):
+        w_i = w[i]
+        o,oo = Oring(yso[0,:],yso[1,:],v,w_i,yso_map,coverage,noP=noProcess)
+        k,kk = kfunc(yso[0,:],yso[1,:],v,yso_map,coverage,noP=noProcess)
+        results[0,i] = oo
+        results[1,i] = kk
+
+        #estimate time remaining
+        toc = time.time()
+        cur = 1+i+a*steps
+        completed = cur/float(4*steps)*100
+        est = toc/(60.0*cur) * (4*steps-cur) #estimates the time left for code to run
+        print('%f%% complete: ~ %f more minutes' %(completed,est))
+
+    np.save('{:s}{:s}_{:s}_reduced_stats'.format(fpath,region,class_list[a]),results)
+    np.save('{:s}{:s}_{:s}_reduced_map'.format(fpath,region,class_list[a]),coverage)
+    
+#coverage = clean_map(coverage,60,p0)
+#area_array = get_area_array()
+#plt.figure()
+#plt.pcolormesh(gx,gy,coverage)
+#plt.plot(yso[0,:],yso[1,:],'*')
+#plt.axis('equal')
 
 #p0=0.01
 #lmda = np.sum(yso_map)/get_area()
