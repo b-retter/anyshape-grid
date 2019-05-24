@@ -1045,7 +1045,7 @@ Coverage map.
 #fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
 #fits_path = '../SFR_data'
 fits_path = '.'
-fits_name = 'SERAQU_IRAC1234M1_cov_sm.fits'
+fits_name = 'SERAQU_IRAC1234M1_cov.fits'
 coverage,header = fits.getdata(os.path.join(fits_path,fits_name), header=True)
 w_obj = wcs.WCS(header)
 ##Find which axis is RA and which is Dec.
@@ -1070,7 +1070,7 @@ bl = (277.2,-2.25)
 tr = (277.7,-1.75)
 bounds = np.array([[277.2,277.7],[-2.25,-1.75]])
 #number of processes
-noProcess = 3
+noProcess = 10
 w_obj,coverage = extract_region(bounds,w_obj,coverage)
 
 #Remove non-binary values from coverage map
@@ -1190,7 +1190,7 @@ for a in range(4):
         toc = time.time()
         cur = 1+i+a*steps
         completed = cur/float(4*steps)*100
-        est = toc/(60.0*cur) * (4*steps-cur) #estimates the time left for code to run
+        est = (toc-tic)/(60.0*cur) * (4*steps-cur) #estimates the time left for code to run
         print('%f%% complete: ~ %f more minutes' %(completed,est))
 
     np.save('{:s}{:s}_{:s}_reduced_stats'.format(fpath,region,class_list[a]),results)
