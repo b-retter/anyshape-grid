@@ -1052,9 +1052,9 @@ Array of grid centre coordinates.
 Coverage map.
 """
 
-fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
+#fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
 #fits_path = '../SFR_data'
-#fits_path = '.'
+fits_path = '.'
 fits_name = 'SER_IRAC1234M1_cov.fits'
 coverage,header = fits.getdata(os.path.join(fits_path,fits_name), header=True)
 w_obj = wcs.WCS(header)
@@ -1078,16 +1078,15 @@ else:
 
 bounds = np.array([[277.4,277.6],[1.18,1.28]])
 #number of processes
-noProcess = 5
+noProcess = 1
 w_obj,coverage = extract_region(bounds,w_obj,coverage)
 
 #Remove non-binary values from coverage map
 cov = np.zeros(np.shape(coverage))
-#cov2 = np.ones(np.shape(coverage))
 cov += coverage == 1
 
 coverage = cov.astype(bool)
-#cov2 = None
+cov = None
 
 ra_axis,dec_axis = np.shape(coverage)
 
@@ -1194,7 +1193,7 @@ for a in range(4):
         print('%f%% complete: ~ %f more minutes' %(completed,est))
 
     np.save('{:s}{:s}_{:s}_stats'.format(fpath,region,class_list[a]),results)
-    np.save('{:s}{:s}_{:s}_map'.format(fpath,region,class_list[a]),coverage)
+    #np.save('{:s}{:s}_{:s}_map'.format(fpath,region,class_list[a]),coverage)
     
 #coverage = clean_map(coverage,60,p0)
 #area_array = get_area_array()
