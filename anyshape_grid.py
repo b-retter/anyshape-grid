@@ -756,16 +756,21 @@ def angle2box(xp,yp,t):
         il,jl = w_obj.all_world2pix(xp-t,yp-t,0)
         ir,jr = w_obj.all_world2pix(xp+t,yp+t,0)
 
-    if jl < 0:
-        jl = 0
-    if il < 0:
-        il = 0
-    if ir > ra_axis:
-        ir = ra_axis
-    if jr > dec_axis:
-        jr = dec_axis
+    #CDELT may be positive or negative
+    #This is to ensure that slicing of the arrays works correctly
+    ras = np.sort([il,ir])
+    decs = np.sort([jl,jr])
+    
+    if ras[0] < 0:
+        ras[0] = 0
+    if decs[0] < 0:
+        decs[0] = 0
+    if ras[1] > ra_axis:
+        ras[1] = ra_axis
+    if decs[1] > dec_axis:
+        decs[1] = dec_axis
 
-    return int(round(il)),int(round(ir)),int(round(jl)),int(round(jr))
+    return int(round(ras[0])),int(round(ras[1])),int(round(decs[0])),int(round(decs[1]))
 
 def collate(results):
     array = np.empty([4,LOOPS,len(r)])
