@@ -835,6 +835,25 @@ def allenv(val,r,w,LOOPS,mode='sphere_binomial',noP=None,grid=None):
             print('%f%% complete: ~ %f more minutes' %(completed,est))
     return final_results
 
+def get_coords(wcs_obj,grid):
+    """
+    Collect coordinates of pixel centres from a pre-sliced wcs object and 
+    equivalently sliced coverage map.
+    """
+    ra_axis,dec_axis = np.shape(grid)
+    gx = np.arange(ra_axis)
+    gy = np.arange(dec_axis)
+    GX,GY = np.meshgrid(gx,gy,indexing='ij')
+    GX,GY = GX.flatten(), GY.flatten()
+    if inverted:
+        gy,gx = w_obj.all_pix2world(GY,GX,0)
+    else:
+        gx,gy = w_obj.all_pix2world(GX,GY,0)
+        
+    gx, gy = gx.reshape(ra_axis,dec_axis), gy.reshape(ra_axis,dec_axis)
+    
+    return gx,gy
+
 def extract_region(bounds,wcs_obj,grid):
     """
     Extract rectangular section of coverage map designated by ra and dec coordinates.
@@ -860,18 +879,8 @@ def extract_region(bounds,wcs_obj,grid):
     wcs_obj = wcs_obj[int(ra_lims[0]):int(ra_lims[1]),int(dec_lims[0]):int(dec_lims[1])]
 
     ##Getting celestial coordinates of pixel centres for extraction
-    axes = np.shape(grid)
-    gx = np.arange(axes[0])
-    gy = np.arange(axes[1])
-    GX,GY = np.meshgrid(gx,gy,indexing='ij')
-    GX,GY = GX.flatten(), GY.flatten()
+    gx,gy = get_coords(wcs_obj,grid)
     
-    if inverted:
-        gy,gx = wcs_obj.all_pix2world(GY,GX,0)
-    else:
-        gx,gy = wcs_obj.all_pix2world(GX,GY,0)
-
-    gx, gy = gx.reshape(axes[0],axes[1]), gy.reshape(axes[0],axes[1])    
     remove_extra_coverage = np.where( (gx < bl[0]) | (gx > tr[0]) | (gy < bl[1]) | (gy > tr[1]))
     grid[remove_extra_coverage] = False
     return wcs_obj,grid
@@ -1032,7 +1041,8 @@ def clean_map(grid,L,p0):
                 end_grid[i,j] = 0
                 
     return end_grid
-    
+
+
 """
 Extract the relevant data from the fits file. 
 Array size.
@@ -1042,10 +1052,10 @@ Array of grid centre coordinates.
 Coverage map.
 """
 
-#fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
+fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
 #fits_path = '../SFR_data'
-fits_path = '.'
-fits_name = 'SERAQU_IRAC1234M1_cov.fits'
+#fits_path = '.'
+fits_name = 'SER_IRAC1234M1_cov.fits'
 coverage,header = fits.getdata(os.path.join(fits_path,fits_name), header=True)
 w_obj = wcs.WCS(header)
 ##Find which axis is RA and which is Dec.
@@ -1082,16 +1092,7 @@ coverage = cov.astype(bool)
 ra_axis,dec_axis = np.shape(coverage)
 
 ##Getting celestial coordinates of pixel centres
-#
-gx = np.arange(ra_axis)
-gy = np.arange(dec_axis)
-GX,GY = np.meshgrid(gx,gy,indexing='ij')
-GX,GY = GX.flatten(), GY.flatten()
-gy,gx = w_obj.all_pix2world(GY,GX,0)
-gx, gy = gx.reshape(ra_axis,dec_axis), gy.reshape(ra_axis,dec_axis)
-
-##Clear GX and GY from memory
-GX, GY = None, None
+gx,gy = get_coords(w_obj,coverage)
 
 ##Getting pixel scales
 area_array = get_area_array()
