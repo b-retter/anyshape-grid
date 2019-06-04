@@ -846,9 +846,9 @@ def get_coords(wcs_obj,grid):
     GX,GY = np.meshgrid(gx,gy,indexing='ij')
     GX,GY = GX.flatten(), GY.flatten()
     if inverted:
-        gy,gx = w_obj.all_pix2world(GY,GX,0)
+        gy,gx = wcs_obj.all_pix2world(GY,GX,0)
     else:
-        gx,gy = w_obj.all_pix2world(GX,GY,0)
+        gx,gy = wcs_obj.all_pix2world(GX,GY,0)
         
     gx, gy = gx.reshape(ra_axis,dec_axis), gy.reshape(ra_axis,dec_axis)
     
@@ -1086,7 +1086,7 @@ cov = np.zeros(np.shape(coverage))
 cov += coverage == 1
 
 coverage = cov.astype(bool)
-cov = None
+#cov = None
 
 ra_axis,dec_axis = np.shape(coverage)
 
