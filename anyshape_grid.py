@@ -877,11 +877,20 @@ def extract_region(bounds,wcs_obj,grid):
         
     dec_box = np.round(dec_box)
     ra_box = np.round(ra_box)
-    ra_lims,dec_lims = (np.min(ra_box),np.max(ra_box)),(np.min(dec_box),np.max(dec_box))
+
+    #slightly widen box to ensure complete extraction of region
+    ra_lims,dec_lims = (np.min(ra_box)-1,np.max(ra_box)+1),(np.min(dec_box)-1,np.max(dec_box)+1)
 
     #slice map and wcs_object
     grid = grid[int(ra_lims[0]):int(ra_lims[1]),int(dec_lims[0]):int(dec_lims[1])]
-    wcs_obj = wcs_obj[int(ra_lims[0]):int(ra_lims[1]),int(dec_lims[0]):int(dec_lims[1])]
+
+    #according to astropy documentation the order of wcs slices "should be reversed (as for the data)
+    #compared to the natural WCS order." Which I have interpreted to mean the second axes of the WCS
+    #object is sliced using the first slice and vice versa.
+    if inverted:
+        wcs_obj = wcs_obj[int(ra_lims[0]):int(ra_lims[1]),int(dec_lims[0]):int(dec_lims[1])]
+    else:
+        wcs_obj = wcs_obj[int(dec_lims[0]):int(dec_lims[1]),int(ra_lims[0]):int(ra_lims[1])]
 
     ##Getting celestial coordinates of pixel centres for extraction
     gx,gy = get_coords(wcs_obj,grid)
