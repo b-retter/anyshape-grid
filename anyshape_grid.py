@@ -884,8 +884,16 @@ def extract_region(bounds,wcs_obj,grid):
     ra_box = np.round(ra_box)
 
     #slightly widen box to ensure complete extraction of region
-    ra_lims,dec_lims = (np.min(ra_box)-1,np.max(ra_box)+1),(np.min(dec_box)-1,np.max(dec_box)+1)
+    ra_lims,dec_lims = [np.min(ra_box)-1,np.max(ra_box)+1],[np.min(dec_box)-1,np.max(dec_box)+1]
 
+    axes_lims = np.shape(coverage)
+    #make sure no impossible slices are attempted
+    ra_lims[0] = 0 if ra_lims[0] < 0 else ra_lims[0]
+    ra_lims[1] = axes_lims[0] if ra_lims[1] > axes_lims[0] else ra_lims[1]
+
+    dec_lims[0] = 0 if dec_lims[0] < 0 else dec_lims[0]
+    dec_lims[1] = axes_lims[1] if dec_lims[1] > axes_lims[1] else dec_lims[1]
+    
     #slice map and wcs_object
     grid = grid[int(ra_lims[0]):int(ra_lims[1]),int(dec_lims[0]):int(dec_lims[1])]
 
@@ -1074,7 +1082,7 @@ Coverage map.
 #fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
 #fits_path = '../SFR_data'
 fits_path = '.'
-fits_name = 'SER_IRAC1234M1_cov.fits'
+fits_name = 'OPH_ALL_IRAC1234M1_cov.fits'
 coverage,header = fits.getdata(os.path.join(fits_path,fits_name), header=True)
 w_obj = wcs.WCS(header)
 ##Find which axis is RA and which is Dec.
@@ -1095,7 +1103,7 @@ else:
 ##Extracting sections of map
 #desired sector of sky bottom-left and top-right.
 
-bounds = np.array([[277.4,277.6],[1.18,1.28]])
+bounds = np.array([[244.4,250.0],[-25.2,-22.8]])
 #number of processes
 noProcess = 1
 w_obj,coverage = extract_region(bounds,w_obj,coverage)
@@ -1136,7 +1144,7 @@ alpha_mask = np.array([class01_mask,flat_mask,class2_mask,class3_mask])
 pos_data = data[:,:2]
 pos_mask = (pos_data[:,0] > bounds[0,0]) & (pos_data[:,0] < bounds[0,1]) & (pos_data[:,1] > bounds[1,0]) & (pos_data[:,1] < bounds[1,1])
 
-region = 'serpens_core'
+region = 'ophiuchus'
 fpath = '{:s}/'.format(region)
 class_list = ['classI0','flat','classII','classIII']
 #loop over each yso class
@@ -1193,7 +1201,7 @@ for a in range(4):
     
     #Get stats
     steps = 20
-    r = np.linspace(0.001,0.05,steps)
+    r = np.linspace(0.01,1.2,steps)
     w = r*0.6
 
     results = np.empty((2,steps))
