@@ -840,14 +840,19 @@ def allenv(val,r,w,LOOPS,mode='sphere_binomial',noP=None,grid=None):
             print('%f%% complete: ~ %f more minutes' %(completed,est))
     return final_results
 
-def get_coords(wcs_obj,grid):
+def get_coords(wcs_obj,grid,centre=True):
     """
     Collect coordinates of pixel centres from a pre-sliced wcs object and 
     equivalently sliced coverage map.
     """
     ra_axis,dec_axis = np.shape(grid)
-    gx = np.arange(ra_axis)
-    gy = np.arange(dec_axis)
+    if centre:
+        gx = np.arange(ra_axis)
+        gy = np.arange(dec_axis)
+    elif centre==False:
+        gx = np.arange(0.5,ra_axis)-1
+        gy = np.arange(0.5,dec_axis)-1
+        
     GX,GY = np.meshgrid(gx,gy,indexing='ij')
     GX,GY = GX.flatten(), GY.flatten()
     if inverted:
