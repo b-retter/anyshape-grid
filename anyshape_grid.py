@@ -1104,7 +1104,7 @@ else:
 ##Extracting sections of map
 #desired sector of sky bottom-left and top-right.
 
-bounds = np.array([[52.0,53.0],[31,32]])
+bounds = np.array([[55.8,56.4],[31.9,32.5]])
 
 #number of processes
 noProcess = 1
@@ -1146,7 +1146,7 @@ alpha_mask = np.array([class01_mask,flat_mask,class2_mask,class3_mask])
 pos_data = data[:,:2]
 pos_mask = (pos_data[:,0] > bounds[0,0]) & (pos_data[:,0] < bounds[0,1]) & (pos_data[:,1] > bounds[1,0]) & (pos_data[:,1] < bounds[1,1])
 
-region = 'ngc1333'
+region = 'ic348'
 fpath = '{:s}/'.format(region)
 class_list = ['classI0','flat','classII','classIII']
 #loop over each yso class
@@ -1203,7 +1203,7 @@ for a in range(4):
     
     #Get stats
     steps = 20
-    r = np.linspace(0.01,0.5,steps)
+    r = np.linspace(0.01,0.3,steps)
     w = r*0.6
 
     results = np.empty((2,steps))
