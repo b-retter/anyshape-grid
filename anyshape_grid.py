@@ -1082,9 +1082,10 @@ Coverage map.
 #fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
 #fits_path = '../SFR_data'
 fits_path = '.'
-fits_name = 'OPH_ALL_IRAC1234M1_cov.fits'
+fits_name = 'PER_IRAC1234M1_cov.fits'
 coverage,header = fits.getdata(os.path.join(fits_path,fits_name), header=True)
 w_obj = wcs.WCS(header)
+
 ##Find which axis is RA and which is Dec.
 ##inverted kayword defines if axes are RA and Dec or
 ##Dec and RA.
@@ -1103,7 +1104,8 @@ else:
 ##Extracting sections of map
 #desired sector of sky bottom-left and top-right.
 
-bounds = np.array([[244.4,250.0],[-25.2,-22.8]])
+bounds = np.array([[52.0,53.0],[31,32]])
+
 #number of processes
 noProcess = 1
 w_obj,coverage = extract_region(bounds,w_obj,coverage)
@@ -1144,7 +1146,7 @@ alpha_mask = np.array([class01_mask,flat_mask,class2_mask,class3_mask])
 pos_data = data[:,:2]
 pos_mask = (pos_data[:,0] > bounds[0,0]) & (pos_data[:,0] < bounds[0,1]) & (pos_data[:,1] > bounds[1,0]) & (pos_data[:,1] < bounds[1,1])
 
-region = 'ophiuchus'
+region = 'ngc1333'
 fpath = '{:s}/'.format(region)
 class_list = ['classI0','flat','classII','classIII']
 #loop over each yso class
@@ -1201,7 +1203,7 @@ for a in range(4):
     
     #Get stats
     steps = 20
-    r = np.linspace(0.01,1.2,steps)
+    r = np.linspace(0.01,0.5,steps)
     w = r*0.6
 
     results = np.empty((2,steps))
