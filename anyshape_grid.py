@@ -1145,14 +1145,15 @@ class3_mask = data[:,2] < -1.6
 alpha_mask = np.array([class01_mask,flat_mask,class2_mask,class3_mask])
 pos_data = data[:,:2]
 pos_mask = (pos_data[:,0] > bounds[0,0]) & (pos_data[:,0] < bounds[0,1]) & (pos_data[:,1] > bounds[1,0]) & (pos_data[:,1] < bounds[1,1])
+all_mask = class01_mask+flat_mask+class2_mask+class3_mask
 
 region = 'ic348'
 fpath = '{:s}/'.format(region)
-class_list = ['classI0','flat','classII','classIII']
+class_list = ['classI0','flat','classII','classIII','all']
 #loop over each yso class
 
 tic = time.time()
-for a in range(4):
+for a in range(len(class_list)):
     #reset coverage map for each yso class
     coverage = cov.astype(bool)
     area_array = get_area_array()
@@ -1217,8 +1218,8 @@ for a in range(4):
         #estimate time remaining
         toc = time.time()
         cur = 1+i+a*steps
-        completed = cur/float(4*steps)*100
-        est = (toc-tic)/(60.0*cur) * (4*steps-cur) #estimates the time left for code to run
+        completed = cur/float(len(class_list)*steps)*100
+        est = (toc-tic)/(60.0*cur) * (len(class_list)*steps-cur) #estimates the time left for code to run
         print('%f%% complete: ~ %f more minutes' %(completed,est))
 
     np.save('{:s}{:s}_{:s}_stats'.format(fpath,region,class_list[a]),results)
