@@ -680,7 +680,7 @@ def gcircle(p1,p2):
     sep = np.arctan(s1/s2)
     return sep*180/np.pi
 
-def get_area_array(tan=True,grid=None):
+def get_area_array(tan=True,grid=None,wcs_obj=None):
     """
     Return the celestial pixel areas for each pixel
     in the FITS file.
@@ -695,6 +695,8 @@ def get_area_array(tan=True,grid=None):
 
     if grid is None:
         grid = coverage
+    if wcs_obj is None:
+        wcs_obj = w_obj
         
     if tan:
         #If tan projection use da_sphere = cos**3(theta)*da_plane
@@ -708,8 +710,8 @@ def get_area_array(tan=True,grid=None):
         d2r = lambda x: x*np.pi/180.0
         
         angles = gcircle((gx,gy),(ra_ref,dec_ref))
-        ref_area = wcs.utils.proj_plane_pixel_area(w_obj)
-        return np.cos(d2r(angles))**3*ref_area*coverage
+        ref_area = wcs.utils.proj_plane_pixel_area(wcs_obj)
+        return np.cos(d2r(angles))**3*ref_area*grid
     else:
         #Find RA and Dec at each grid coordinate
         grx = np.arange(ra_axis+1)
