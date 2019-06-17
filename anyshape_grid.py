@@ -1071,6 +1071,115 @@ def clean_map(grid,L,p0):
                 
     return end_grid
 
+def foi_map(grid,yso_map,L):
+    """
+    uses a square window with side length L to estimate first-order 
+    intensity map.
+    The minimum number of ysos is specified by p0 using the method by 
+    Wiegand et al 2004.
+    """
+
+    shape = np.shape(grid)
+    lmda_map = np.zeros(shape)
+    half_width = int(round(L/2.0))
+
+
+    for i in range(shape[0]):
+        i0 = i-half_width
+        i1 = i+half_width
+        if i0 < 0:
+            i0 = 0
+        if i1 >= shape[0]:
+            i1 = shape[0]
+            
+        for j in range(shape[1]):
+            ##skip point if already excluded from coverage map
+            if grid[i,j] == 0:
+                continue
+            
+            j0 = j-half_width
+            j1 = j+half_width       
+            if j0 < 0:
+                j0 = 0
+            if j1 >= shape[1]:
+                j1 = shape[1]
+                
+            w = np.sum(area_array[i0:i1,j0:j1])
+            n_yso = np.sum(yso_map[i0:i1,j0:j1])
+                
+            lmda_map[i,j] = n_yso/float(w)
+            
+    return lmda_map
+
+def nhpp(val,density,mode=1):
+    """
+    Generates ysos using a non-homogenous Poisson Process.
+    val is the total number of YSOs generated.
+    density is the non-normalised density field.
+    mode 1 generates locations for YSOs and then determines if they survive.
+    mode 2 chooses the location of a YSO based on the probability field.
+    """
+
+    shape = np.shape(density)
+    yso_map = np.zeros(shape)
+    yso_x = []
+    yso_y = []
+    if mode == 1:
+        prob = density/float(np.sum(density))
+        loop_count = 0
+        while np.sum(yso_map) < val:
+            loop_count+=1
+            #Repeat until desired number of ysos have been added to the map
+            d2r = lambda x: x*np.pi/180
+            n_yso = val-int(np.sum(yso_map))
+            x = (np.max(gx)-np.min(gx))*rnd.rand(n_yso)+np.min(gx)
+
+            r_theta = rnd.rand(val-int(np.sum(yso_map)))
+            vmin = 0.5*(np.cos(np.pi/2-d2r(np.min(gy)))+1)
+            vmax = 0.5*(np.cos(np.pi/2-d2r(np.max(gy)))+1)
+            del_v = vmax-vmin
+            V = del_v*r_theta+vmin
+            y = 90-180/np.pi*np.arccos(2*V-1)
+
+            if inverted:
+                jj,ii = w_obj.all_world2pix(y,x,0)
+            else:
+                ii,jj = w_obj.all_world2pix(x,y,0)
+
+            roll = rnd.rand(n_yso)
+            for yso in range(n_yso):
+                if inside_check(x[yso],y[yso]):
+                    if roll[yso] <= prob[int(ii[yso]),int(jj[yso])]:
+                        yso_map[int(ii[yso]),int(jj[yso])] += 1
+                        yso_x = np.append(yso_x,x[yso])
+                        yso_y = np.append(yso_y,y[yso])
+                    else:
+                        continue
+    elif mode == 2:
+        ##Generate pdf
+        prob = density*area_array/np.sum(density*area_array)
+        prob_flat = prob.flatten()
+        cdf = np.cumsum(prob_flat)
+        r_numbers = rnd.rand(val)
+        for rnd_num in r_numbers:
+            rho = prob_flat[np.argmin(np.abs(cdf-rnd_num))]
+            ii,jj = np.where(prob == rho)
+            
+            #if multiple exist, choose one at random
+            if len(ii) > 1:
+                choose = rnd.randint(0,len(ii))
+                ii,jj = ii[choose],jj[choose]
+
+            yso_map[ii,jj] += 1
+            #generate a random location for the yso within the pixel
+            if inverted:
+                y,x = w_obj.all_pix2world(rnd.rand()+jj-0.5,rnd.rand()+ii-0.5,0)
+            else:
+                x,y = w_obj.all_pix2world(rnd.rand()+ii-0.5,rnd.rand()+jj-0.5,0)
+            yso_x = np.append(yso_x,x)
+            yso_y = np.append(yso_y,y)
+                                      
+    return np.vstack([yso_x,yso_y]), yso_map
 
 """
 Extract the relevant data from the fits file. 
