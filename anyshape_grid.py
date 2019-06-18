@@ -1252,11 +1252,12 @@ class01_mask = data[:,2] >= 0.3
 flat_mask = (-0.3 <= data[:,2]) & (data[:,2] < 0.3)
 class2_mask = (-1.6 <= data[:,2]) & (data[:,2] < -0.3)
 class3_mask = data[:,2] < -1.6
+all_mask = class01_mask+flat_mask+class2_mask+class3_mask
 
-alpha_mask = np.array([class01_mask,flat_mask,class2_mask,class3_mask])
+alpha_mask = np.array([class01_mask,flat_mask,class2_mask,class3_mask,all_mask])
 pos_data = data[:,:2]
 pos_mask = (pos_data[:,0] > bounds[0,0]) & (pos_data[:,0] < bounds[0,1]) & (pos_data[:,1] > bounds[1,0]) & (pos_data[:,1] < bounds[1,1])
-all_mask = class01_mask+flat_mask+class2_mask+class3_mask
+
 
 region = 'ic348'
 fpath = '{:s}/'.format(region)
