@@ -1193,7 +1193,7 @@ Coverage map.
 #fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
 #fits_path = '../SFR_data'
 fits_path = '.'
-fits_name = 'PER_IRAC1234M1_cov.fits'
+fits_name = 'OPH_IRAC1234M1_cov_sm.fits'
 coverage,header = fits.getdata(os.path.join(fits_path,fits_name), header=True)
 w_obj = wcs.WCS(header)
 
@@ -1215,7 +1215,7 @@ else:
 ##Extracting sections of map
 #desired sector of sky bottom-left and top-right.
 
-bounds = np.array([[55.8,56.4],[31.9,32.5]])
+bounds = np.array([[244.4,250],[-25.2,-22.8]])
 
 #number of processes
 noProcess = 1
@@ -1259,13 +1259,13 @@ pos_data = data[:,:2]
 pos_mask = (pos_data[:,0] > bounds[0,0]) & (pos_data[:,0] < bounds[0,1]) & (pos_data[:,1] > bounds[1,0]) & (pos_data[:,1] < bounds[1,1])
 
 
-region = 'ic348'
+region = 'ophiuchus'
 fpath = '{:s}/'.format(region)
 class_list = ['classI0','flat','classII','classIII','all']
 #loop over each yso class
 
 tic = time.time()
-for a in range(len(class_list)):
+for a in range(5):
     #reset coverage map for each yso class
     coverage = cov.astype(bool)
     area_array = get_area_array()
@@ -1316,7 +1316,7 @@ for a in range(len(class_list)):
     
     #Get stats
     steps = 20
-    r = np.linspace(0.01,0.3,steps)
+    r = np.linspace(0.01,1.2,steps)
     w = r*0.6
 
     results = np.empty((2,steps))
