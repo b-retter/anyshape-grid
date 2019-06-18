@@ -793,7 +793,7 @@ def run_csr(val,r,w,mode='sphere_binomial',noP=None,grid=None):
         grid = coverage
 
     #randomise seed
-    rnd.rand()
+    rnd.seed()
 
     yso,yso_map = random_ysos(val,mode,grid)
     steps = len(r)
