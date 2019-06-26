@@ -1162,7 +1162,7 @@ def nhpp(val,density,mode=1):
         cdf = np.cumsum(prob_flat)
         r_numbers = rnd.rand(val)
         for rnd_num in r_numbers:
-            rho = prob_flat[np.argmin(np.abs(cdf-rnd_num))]
+            rho = prob_flat[np.argmin((cdf-rnd_num)<0)]
             ii,jj = np.where(prob == rho)
             
             #if multiple exist, choose one at random
