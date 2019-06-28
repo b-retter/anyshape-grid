@@ -1,0 +1,223 @@
+diff --git a/anyshape_grid.py b/anyshape_grid.py
+index 97e74a7..bec0c3c 100644
+--- a/anyshape_grid.py
++++ b/anyshape_grid.py
+@@ -347,6 +347,8 @@ def random_ysos(val,mode='binomial',grid=None,density=None):
+                         yso_y = np.append(yso_y,y[i])
+                         
+     elif mode == 'nhpp2':
++        ## "position first" method of placing YSOs randomly within a probability map.
++        ## The probability map in this case is determined entirely by the density array.
+         prob = density/float(np.sum(density))
+         loop_count = 0
+         while np.sum(yso_map) < val:
+@@ -378,6 +380,8 @@ def random_ysos(val,mode='binomial',grid=None,density=None):
+                     else:
+                         continue
+     elif mode == 'nhpp':
++        ## "survival first" method of generating non-homogenous distributions of random YSOs.
++        ## Probability of positioning is based on cell size and density of given cell.
+         ##Generate pdf
+         prob = density*area_array/np.sum(density*area_array)
+         prob_flat = prob.flatten()
+@@ -734,7 +738,7 @@ def gcircle(p1,p2):
+     sep = np.arctan(s1/s2)
+     return sep*180/np.pi
+ 
+-def get_area_array(tan=True,grid=None,wcs_obj=None):
++def get_area_array(tan=True,grid=None):
+     """
+     Return the celestial pixel areas for each pixel
+     in the FITS file.
+@@ -749,8 +753,6 @@ def get_area_array(tan=True,grid=None,wcs_obj=None):
+ 
+     if grid is None:
+         grid = coverage
+-    if wcs_obj is None:
+-        wcs_obj = w_obj
+         
+     if tan:
+         #If tan projection use da_sphere = cos**3(theta)*da_plane
+@@ -764,8 +766,8 @@ def get_area_array(tan=True,grid=None,wcs_obj=None):
+         d2r = lambda x: x*np.pi/180.0
+         
+         angles = gcircle((gx,gy),(ra_ref,dec_ref))
+-        ref_area = wcs.utils.proj_plane_pixel_area(wcs_obj)
+-        return np.cos(d2r(angles))**3*ref_area*grid
++        ref_area = wcs.utils.proj_plane_pixel_area(w_obj)
++        return np.cos(d2r(angles))**3*ref_area*coverage
+     else:
+         #Find RA and Dec at each grid coordinate
+         grx = np.arange(ra_axis+1)
+@@ -881,8 +883,12 @@ def allenv(val,r,w,LOOPS,mode='sphere_binomial',noP=None,grid=None,density=None,
+         pool = mp.Pool(noP)
+         results = []
+         for loop in range(LOOPS):
+-            results.append(pool.apply_async(run_csr,(val,r,w,mode,None,grid),callback=callbackTimer))
+-
++            #if timer requested
++            if timer:
++                results.append(pool.apply_async(run_csr,(val,r,w,mode,None,grid,density),callback=callbackTimer))
++            else:
++                results.append(pool.apply_async(run_csr,(val,r,w,mode,None,grid,density)))
++                
+         final_results = np.empty((2,LOOPS,len(r)))
+         for loop in range(LOOPS):
+             final_results[:,loop,:] = results[loop].get()
+@@ -1179,7 +1185,7 @@ Coverage map.
+ #fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
+ #fits_path = '../SFR_data'
+ fits_path = '.'
+-fits_name = 'SER_IRAC1234M1_cov.fits'
++fits_name = 'SERAQU_IRAC1234M1_cov_sm.fits'
+ coverage,header = fits.getdata(os.path.join(fits_path,fits_name), header=True)
+ w_obj = wcs.WCS(header)
+ 
+@@ -1200,8 +1206,7 @@ else:
+ 
+ ##Extracting sections of map
+ #desired sector of sky bottom-left and top-right.
+-
+-bounds = np.array([[277.4,277.6],[1.18,1.28]])
++bounds = np.array([[277.2,277.7],[-2.25,-1.75]])
+ 
+ #number of processes
+ noProcess = 1
+@@ -1212,8 +1217,7 @@ cov = np.zeros(np.shape(coverage))
+ cov += coverage == 1
+ 
+ coverage = cov.astype(bool)
+-#cov = None
+-
++cov = None
+ ra_axis,dec_axis = np.shape(coverage)
+ 
+ ##Getting celestial coordinates of pixel centres
+@@ -1244,102 +1248,32 @@ alpha_mask = np.array([class01_mask,flat_mask,class2_mask,class3_mask,all_mask])
+ pos_data = data[:,:2]
+ pos_mask = (pos_data[:,0] > bounds[0,0]) & (pos_data[:,0] < bounds[0,1]) & (pos_data[:,1] > bounds[1,0]) & (pos_data[:,1] < bounds[1,1])
+ 
+-
+-region = 'serpens_core'
+-fpath = '{:s}/'.format(region)
+-class_list = ['classI0','flat','classII','classIII','all']
++##Initialise envelope
++noProcesses = 6
+ #loop over each yso class
+-
+ tic = time.time()
+-for a in range(4,5):
+-    #reset coverage map for each yso class
+-    coverage = cov.astype(bool)
+-    area_array = get_area_array()
+-    
+-    total_mask = pos_mask & alpha_mask[a]
++region = 'serpens_south'
++fpath = '{:s}/'.format(region)
++class_list = ['classI0','flat','classII','classIII','all']
++for a in range(1):
++    total_mask = pos_mask & alpha_mask[a,:]
+     yso = data[total_mask,:2]
+-    yso = yso.T
+-    yso_map = yso_to_grid(yso)
+-    
+-    # #save image of each coverage map
+-    # plt.figure()
+-    # plt.pcolormesh(gx,gy,coverage)
+-    # plt.plot(yso[0,:],yso[1,:],'*')
+-    # plt.xlabel('RA')
+-    # plt.ylabel('Dec')
+-    # plt.title('Non-reduced coverage map for {:s} {:s} YSOs'.format(region,class_list[a]))
+-    # plt.axis('equal')
+-    # plt.savefig('{:s}{:s}_{:s}_map.png'.format(fpath,region,class_list[a]))
+-
+-    # #uncomment to perform map reduction
+-    # #First pass
+-    # p0=0.01
+-    # lmda = np.sum(yso_map)/get_area()
+-    # wmin = -np.log(p0)/lmda
+-    # L_sqrd = wmin/total_area*np.size(coverage)
+-    # L = np.sqrt(L_sqrd)
+-    # coverage,yso_map = reduce_map(coverage,yso_map,int(1.5*L),p0,0,True)
+-    # area_array = get_area_array()
+-
+-    # #Second pass
+-    # p0=0.01
+-    # lmda = np.sum(yso_map)/get_area()
+-    # wmin = -np.log(p0)/lmda
+-    # L_sqrd = wmin/total_area*np.size(coverage)
+-    # L = np.sqrt(L_sqrd)
+-    # coverage,yso_map = reduce_map(coverage,yso_map,L,p0,1,True)
+-    # area_array = get_area_array()
+-
+-    # #save image of each reduced coverage map
+-    # plt.figure()
+-    # plt.pcolormesh(gx,gy,coverage)
+-    # plt.plot(yso[0,:],yso[1,:],'*')
+-    # plt.xlabel('RA')
+-    # plt.ylabel('Dec')
+-    # plt.title('Reduced coverage map for {:s} {:s} YSOs'.format(region,class_list[a]))
+-    # plt.axis('equal')
+-    # plt.savefig('{:s}{:s}_{:s}_reduced_map.png'.format(fpath,region,class_list[a]))
+-    
+-    #Get stats
+     steps = 20
+-    r = np.linspace(0.001,0.05,steps)
+-    w = r*0.6
+-
+-    results = np.empty((2,steps))
+-    for i,v in enumerate(r):
+-        w_i = w[i]
+-        o,oo = Oring(yso[0,:],yso[1,:],v,w_i,yso_map,coverage,noP=noProcess)
+-        k,kk = kfunc(yso[0,:],yso[1,:],v,yso_map,coverage,noP=noProcess)
+-        results[0,i] = oo
+-        results[1,i] = kk
+-
+-        #estimate time remaining
+-        toc = time.time()
+-        cur = 1+i+a*steps
+-        completed = cur/float(len(class_list)*steps)*100
+-        est = (toc-tic)/(60.0*cur) * (len(class_list)*steps-cur) #estimates the time left for code to run
+-        print('%f%% complete: ~ %f more minutes' %(completed,est))
+-
+-    np.save('{:s}{:s}_{:s}_stats'.format(fpath,region,class_list[a]),results)
+-    #np.save('{:s}{:s}_{:s}_map'.format(fpath,region,class_list[a]),coverage)
+-    
+-#coverage = clean_map(coverage,60,p0)
+-#area_array = get_area_array()
+-#plt.figure()
+-#plt.pcolormesh(gx,gy,coverage)
+-#plt.plot(yso[0,:],yso[1,:],'*')
+-#plt.axis('equal')
+-
+-#p0=0.01
+-#lmda = np.sum(yso_map)/get_area()
+-#wmin = -np.log(p0)/lmda
+-#L_sqrd = wmin/get_area()*np.size(coverage)
+-#coverage,yso_map = reduce_map(coverage,yso_map,np.sqrt(L_sqrd),p0,True)
+-#area_array = get_area_array()
+-
+-#plt.figure()
+-#plt.pcolormesh(gx,gy,coverage)
+-#plt.plot(yso[0,:],yso[1,:],'*')
+-#plt.axis('equal')
+-
+-#plt.show()
++    r = np.linspace(0.01,0.25,steps)
++    w = 0.6*r
++    val = int(np.shape(yso)[0])
++
++    L = 60
++    lmda_map = foi_map(coverage,yso_to_grid(yso.T),L)
++    LOOPS = 99
++    results = allenv(val,r,w,LOOPS,mode='nhpp',noP=noProcesses,grid=coverage,density=lmda_map,timer=True)
++
++    #estimate time remaining
++    toc = time.time()
++    cur = 1+a
++    completed = cur/float(len(class_list))*100
++    est = ((toc-tic)/60.0)*(float(len(class_list))/cur -1) #estimates the time left for code to run
++    print('{:s} complete: ~ {:.3f} more minutes'.format(class_list[a],est))
++
++    np.save('{:s}{:s}_{:s}_map_nhpp.npy'.format(fpath,region,class_list[a]),results)
++    np.save('{:s}{:s}_{:s}_foi_map_nhpp.npy'.format(fpath,region,class_list[a]),lmda_map)

@@ -881,8 +881,12 @@ def allenv(val,r,w,LOOPS,mode='sphere_binomial',noP=None,grid=None,density=None,
         pool = mp.Pool(noP)
         results = []
         for loop in range(LOOPS):
-            results.append(pool.apply_async(run_csr,(val,r,w,mode,None,grid),callback=callbackTimer))
-
+            #if timer requested
+            if timer:
+                results.append(pool.apply_async(run_csr,(val,r,w,mode,None,grid,density),callback=callbackTimer))
+            else:
+                results.append(pool.apply_async(run_csr,(val,r,w,mode,None,grid,density)))
+                
         final_results = np.empty((2,LOOPS,len(r)))
         for loop in range(LOOPS):
             final_results[:,loop,:] = results[loop].get()
