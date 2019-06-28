@@ -269,7 +269,7 @@ def yso_to_grid(yso,grid=None,yso_return=False):
     elif yso_return == False:
         return yso_map*grid
     
-def random_ysos(val,mode='binomial',grid=None):
+def random_ysos(val,mode='binomial',grid=None,density=None):
     """
     Function to populate a grid with random YSOs. YSOs can be placed anywhere
     with grid == 1.
@@ -345,8 +345,62 @@ def random_ysos(val,mode='binomial',grid=None):
                         yso_map[xy2grid(x[i],y[i])] += 1
                         yso_x = np.append(yso_x,x[i])
                         yso_y = np.append(yso_y,y[i])
+                        
+    elif mode == 'nhpp2':
+        prob = density/float(np.sum(density))
+        loop_count = 0
+        while np.sum(yso_map) < val:
+            loop_count+=1
+            #Repeat until desired number of ysos have been added to the map
+            d2r = lambda x: x*np.pi/180
+            n_yso = val-int(np.sum(yso_map))
+            x = (np.max(gx)-np.min(gx))*rnd.rand(n_yso)+np.min(gx)
 
-        return np.vstack([yso_x,yso_y]), yso_map
+            r_theta = rnd.rand(val-int(np.sum(yso_map)))
+            vmin = 0.5*(np.cos(np.pi/2-d2r(np.min(gy)))+1)
+            vmax = 0.5*(np.cos(np.pi/2-d2r(np.max(gy)))+1)
+            del_v = vmax-vmin
+            V = del_v*r_theta+vmin
+            y = 90-180/np.pi*np.arccos(2*V-1)
+
+            if inverted:
+                jj,ii = w_obj.all_world2pix(y,x,0)
+            else:
+                ii,jj = w_obj.all_world2pix(x,y,0)
+
+            roll = rnd.rand(n_yso)
+            for yso in range(n_yso):
+                if inside_check(x[yso],y[yso]):
+                    if roll[yso] <= prob[int(ii[yso]),int(jj[yso])]:
+                        yso_map[int(ii[yso]),int(jj[yso])] += 1
+                        yso_x = np.append(yso_x,x[yso])
+                        yso_y = np.append(yso_y,y[yso])
+                    else:
+                        continue
+    elif mode == 'nhpp':
+        ##Generate pdf
+        prob = density*area_array/np.sum(density*area_array)
+        prob_flat = prob.flatten()
+        cdf = np.cumsum(prob_flat)
+        r_numbers = rnd.rand(val)
+        for rnd_num in r_numbers:
+            rho = prob_flat[np.argmin((cdf-rnd_num)<0)]
+            ii,jj = np.where(prob == rho)
+            
+            #if multiple exist, choose one at random
+            if len(ii) > 1:
+                choose = rnd.randint(0,len(ii))
+                ii,jj = ii[choose],jj[choose]
+
+            yso_map[ii,jj] += 1
+            #generate a random location for the yso within the pixel
+            if inverted:
+                y,x = w_obj.all_pix2world(rnd.rand()+jj-0.5,rnd.rand()+ii-0.5,0)
+            else:
+                x,y = w_obj.all_pix2world(rnd.rand()+ii-0.5,rnd.rand()+jj-0.5,0)
+            yso_x = np.append(yso_x,x)
+            yso_y = np.append(yso_y,y)
+    return np.vstack([yso_x,yso_y]), yso_map
 
 def one_kfunc(x1,y1,t,yso_map,grid):
     """
@@ -780,13 +834,15 @@ def collate(results):
         array[:,i,:] = np.array(results[i].get())
     return array
 
-def run_csr(val,r,w,mode='sphere_binomial',noP=None,grid=None):
+def run_csr(val,r,w,mode='sphere_binomial',noP=None,grid=None,density=None):
     """
     Perform desired number of runs get Oring and Kfunc data for CSR envelopes.
     r is array of radial distances
     w is either single value or array of bin widths
     noP is number of desired workers to parallelise Oring and K seperately.
     (not recommended)
+    density is the first-order probability map if a non-homogenous Poisson 
+    process is being used.
     """
     #if values not specified take global values
     if grid is None:
@@ -795,7 +851,7 @@ def run_csr(val,r,w,mode='sphere_binomial',noP=None,grid=None):
     #randomise seed
     rnd.seed()
 
-    yso,yso_map = random_ysos(val,mode,grid)
+    yso,yso_map = random_ysos(val,mode,grid,density)
     steps = len(r)
     results = np.empty((2,steps))
     for i,t in enumerate(r):
@@ -811,7 +867,7 @@ def run_csr(val,r,w,mode='sphere_binomial',noP=None,grid=None):
     
     return results
 
-def allenv(val,r,w,LOOPS,mode='sphere_binomial',noP=None,grid=None):
+def allenv(val,r,w,LOOPS,mode='sphere_binomial',noP=None,grid=None,density=None,timer=False):
     """
     perform the LOOPS number of realisations using multiprocessing 
     for increased speed producing results which can then be processed 
@@ -834,7 +890,7 @@ def allenv(val,r,w,LOOPS,mode='sphere_binomial',noP=None,grid=None):
         start = time.time()
         final_results = np.empty((2,LOOPS,len(r)))
         for loop in range(LOOPS):
-            final_results[:,loop,:] = run_csr(val,r,w,mode,None,grid)
+            final_results[:,loop,:] = run_csr(val,r,w,mode,None,grid,density)
 
             #estimate the time left for code to run
             completed = loop/float(LOOPS)*100
@@ -1110,76 +1166,6 @@ def foi_map(grid,yso_map,L):
             lmda_map[i,j] = n_yso/float(w)
             
     return lmda_map
-
-def nhpp(val,density,mode=1):
-    """
-    Generates ysos using a non-homogenous Poisson Process.
-    val is the total number of YSOs generated.
-    density is the non-normalised density field.
-    mode 1 generates locations for YSOs and then determines if they survive.
-    mode 2 chooses the location of a YSO based on the probability field.
-    """
-
-    shape = np.shape(density)
-    yso_map = np.zeros(shape)
-    yso_x = []
-    yso_y = []
-    if mode == 1:
-        prob = density/float(np.sum(density))
-        loop_count = 0
-        while np.sum(yso_map) < val:
-            loop_count+=1
-            #Repeat until desired number of ysos have been added to the map
-            d2r = lambda x: x*np.pi/180
-            n_yso = val-int(np.sum(yso_map))
-            x = (np.max(gx)-np.min(gx))*rnd.rand(n_yso)+np.min(gx)
-
-            r_theta = rnd.rand(val-int(np.sum(yso_map)))
-            vmin = 0.5*(np.cos(np.pi/2-d2r(np.min(gy)))+1)
-            vmax = 0.5*(np.cos(np.pi/2-d2r(np.max(gy)))+1)
-            del_v = vmax-vmin
-            V = del_v*r_theta+vmin
-            y = 90-180/np.pi*np.arccos(2*V-1)
-
-            if inverted:
-                jj,ii = w_obj.all_world2pix(y,x,0)
-            else:
-                ii,jj = w_obj.all_world2pix(x,y,0)
-
-            roll = rnd.rand(n_yso)
-            for yso in range(n_yso):
-                if inside_check(x[yso],y[yso]):
-                    if roll[yso] <= prob[int(ii[yso]),int(jj[yso])]:
-                        yso_map[int(ii[yso]),int(jj[yso])] += 1
-                        yso_x = np.append(yso_x,x[yso])
-                        yso_y = np.append(yso_y,y[yso])
-                    else:
-                        continue
-    elif mode == 2:
-        ##Generate pdf
-        prob = density*area_array/np.sum(density*area_array)
-        prob_flat = prob.flatten()
-        cdf = np.cumsum(prob_flat)
-        r_numbers = rnd.rand(val)
-        for rnd_num in r_numbers:
-            rho = prob_flat[np.argmin((cdf-rnd_num)<0)]
-            ii,jj = np.where(prob == rho)
-            
-            #if multiple exist, choose one at random
-            if len(ii) > 1:
-                choose = rnd.randint(0,len(ii))
-                ii,jj = ii[choose],jj[choose]
-
-            yso_map[ii,jj] += 1
-            #generate a random location for the yso within the pixel
-            if inverted:
-                y,x = w_obj.all_pix2world(rnd.rand()+jj-0.5,rnd.rand()+ii-0.5,0)
-            else:
-                x,y = w_obj.all_pix2world(rnd.rand()+ii-0.5,rnd.rand()+jj-0.5,0)
-            yso_x = np.append(yso_x,x)
-            yso_y = np.append(yso_y,y)
-                                      
-    return np.vstack([yso_x,yso_y]), yso_map
 
 """
 Extract the relevant data from the fits file. 
