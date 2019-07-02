@@ -938,9 +938,9 @@ def extract_region(bounds,wcs_obj,grid):
     
     tl,br = (bl[0],tr[1]),(tr[0],bl[1])
     if inverted:
-        dec_box,ra_box = w_obj.all_world2pix(np.array([bl[1],br[1],tl[1],tr[1]]),np.array([bl[0],br[0],tl[0],tr[0]]),0)
+        dec_box,ra_box = wcs_obj.all_world2pix(np.array([bl[1],br[1],tl[1],tr[1]]),np.array([bl[0],br[0],tl[0],tr[0]]),0)
     else:
-        ra_box,dec_box = w_obj.all_world2pix(np.array([bl[0],br[0],tl[0],tr[0]]),np.array([bl[1],br[1],tl[1],tr[1]]),0)
+        ra_box,dec_box = wcs_obj.all_world2pix(np.array([bl[0],br[0],tl[0],tr[0]]),np.array([bl[1],br[1],tl[1],tr[1]]),0)
         
     dec_box = np.round(dec_box)
     ra_box = np.round(ra_box)
@@ -948,7 +948,7 @@ def extract_region(bounds,wcs_obj,grid):
     #slightly widen box to ensure complete extraction of region
     ra_lims,dec_lims = [np.min(ra_box)-1,np.max(ra_box)+1],[np.min(dec_box)-1,np.max(dec_box)+1]
 
-    axes_lims = np.shape(coverage)
+    axes_lims = np.shape(grid)
     #make sure no impossible slices are attempted
     ra_lims[0] = 0 if ra_lims[0] < 0 else ra_lims[0]
     ra_lims[1] = axes_lims[0] if ra_lims[1] > axes_lims[0] else ra_lims[1]
@@ -1170,6 +1170,69 @@ def foi_map(grid,yso_map,L):
             lmda_map[i,j] = n_yso/float(w)
             
     return lmda_map
+
+def resample_fits(wcs_obj1,grid1,wcs_obj2):
+    """
+    Resample the data from one wcs object into the size and shape of another wcs object.
+    wcs_obj1 is the first wcs object.
+    grid1 is the data from wcs_obj1
+    wcs_obj2 is the second wcs object.
+    """
+    ##Find which axis is RA and which is Dec for each wcs object
+    ##inverted kayword defines if axes are RA and Dec or
+    ##Dec and RA.
+    
+    h1 = wcs_obj1.to_header()
+    naxis = wcs_obj1._naxis
+    if 'DEC' in h1['CTYPE1']:
+        inv1 = True
+        dec1 = naxis[0]
+        ra1 = naxis[1]
+    else:
+        inv1 = False    
+        ra1 = naxis[0]
+        dec1 = naxis[1]
+
+    #if the data is not (ra,dec) transpose the array
+    if grid1.shape[0] != ra1 and grid1.shape[1] != dec1:
+        print('Data does not appear to have axes (ra,dec). Trying with transpose.')
+        grid1 = grid1.T
+
+    h2 = wcs_obj2.to_header()
+    naxis = wcs_obj2._naxis
+    if 'DEC' in h2['CTYPE1']:
+        inv2 = True
+        dec2 = naxis[0]
+        ra2 = naxis[1]
+    else:
+        inv2 = False    
+        ra2 = naxis[0]
+        dec2 = naxis[1]
+
+    #get the world coordinates for wcs_obj2
+    gx = np.arange(ra2)
+    gy = np.arange(dec2)
+        
+    GX,GY = np.meshgrid(gx,gy,indexing='ij')
+    GX,GY = GX.flatten(), GY.flatten()
+    if inv2:
+        gy,gx = wcs_obj2.all_pix2world(GY,GX,0)
+    else:
+        gx,gy = wcs_obj2.all_pix2world(GX,GY,0)
+
+    #find the grid coordinates in wcs_obj1 for each pixel in wcs_obj2
+    if inv1:
+        gy1,gx1 = wcs_obj1.all_world2pix(gy,gx,0)
+    else:
+        gx1,gy1 = wcs_obj1.all_world2pix(gx,gy,0)
+
+    print(gx1.shape)
+    print(GX.shape)
+    grid2 = np.empty((ra2,dec2))
+    print(grid2.shape)
+    grid2[GX,GY] = grid1[gx1.astype('int'),gy1.astype('int')] 
+    
+    return grid2
 
 """
 Extract the relevant data from the fits file. 
