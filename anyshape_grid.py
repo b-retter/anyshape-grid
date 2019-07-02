@@ -1226,10 +1226,7 @@ def resample_fits(wcs_obj1,grid1,wcs_obj2):
     else:
         gx1,gy1 = wcs_obj1.all_world2pix(gx,gy,0)
 
-    print(gx1.shape)
-    print(GX.shape)
     grid2 = np.empty((ra2,dec2))
-    print(grid2.shape)
     grid2[GX,GY] = grid1[gx1.astype('int'),gy1.astype('int')] 
     
     return grid2
