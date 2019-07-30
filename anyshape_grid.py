@@ -752,15 +752,18 @@ def get_area_array(tan=True,grid=None,wcs_obj=None):
     if wcs_obj is None:
         wcs_obj = w_obj
         
+    h = wcs_obj.to_header()
+    if 'DEC' in h['CTYPE1']:
+        inverted = True
+        ra_ref = header['CRVAL2']
+        dec_ref = header['CRVAL1']
+    else:
+        inverted = False
+        dec_ref = header['CRVAL2']
+        ra_ref = header['CRVAL1']
+        
     if tan:
         #If tan projection use da_sphere = cos**3(theta)*da_plane
-        if inverted:
-            ra_ref = header['CRVAL2']
-            dec_ref = header['CRVAL1']
-        else:
-            dec_ref = header['CRVAL2']
-            ra_ref = header['CRVAL1']
-
         d2r = lambda x: x*np.pi/180.0
         
         angles = gcircle((gx,gy),(ra_ref,dec_ref))
@@ -788,7 +791,7 @@ def get_area_array(tan=True,grid=None,wcs_obj=None):
         angle_part = np.sin(np.pi/2-gry[:ra_axis,:dec_axis]*np.pi/180.0)
         #celestial steradians for all pixels
         return angle_part*(dRA*dDec)/(np.cos(theta)**2)
-
+    
 def angle2box(xp,yp,t):
     """
     Calculate a VERY conservative estimate of the grid squares
