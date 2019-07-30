@@ -1231,7 +1231,7 @@ def resample_fits(wcs_obj1,grid1,wcs_obj2):
     
     return grid2
 
-def extinction_prob(yso,bins,area,density,wcs_obj=None):
+def extinction_prob(yso,avbins,area,density,wcs_obj=None):
     """
     extinction_prob finds the probability that a pixel with a given extinction is likely to contain a YSO.
     This is calculated by binning the extinction values and counting the both the number of YSOs within 
@@ -1239,17 +1239,13 @@ def extinction_prob(yso,bins,area,density,wcs_obj=None):
     yso is an array containing the world coordinate locations of the ysos of interest.
     density is the 2d array containing the current probabilities of yso placement at each
     position in the array.
-    bins is a three element list of the form [first, last, #bins], describing the left-most bin-edge,
-    the right-most bin edge and the desired number of bins.
+    avbins is an array of the bin edges.
     wcs_obj is the wcs object for the density array.
     """
     yso_dec,yso_ra = wcs_obj.all_world2pix(yso[1,:],yso[0,:],0)
     ysoAv = density[yso_ra.astype('int'),yso_dec.astype('int')]
-
-    yso_c = np.zeros(bins[2])
-    area_c = np.zeros(bins[2])
-    bins[2] += 1
-    avbins = np.linspace(*bins)
+    yso_c = np.zeros(len(avbins)-1)
+    area_c = np.zeros(len(avbins)-1)
     for i in range(len(avbins)):
         if i+1 == len(avbins):
             continue
@@ -1269,6 +1265,7 @@ def extinction_prob(yso,bins,area,density,wcs_obj=None):
             else:
                 map2[i,j] = prob[np.argmin((avbins-density[i,j])<0)-1]
     return map2
+
 """
 Extract the relevant data from the fits file. 
 Array size.
