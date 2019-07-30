@@ -1324,7 +1324,8 @@ total_area = np.sum(area_array)
 
 ##Getting ysos
 dfile = 'dunham15_tab_ysos_coords.txt'
-data = np.loadtxt(dfile,skiprows=1,usecols=(2,3,8))
+data = np.loadtxt(dfile,skiprows=1,usecols=(2,3,8,9))
+agb_data = np.loadtxt(dfile,dtype='string',skiprows=1,usecols=(11,))
 
 #Class limits with corrected alpha 
 #Class 0/I  alpha >= 0.3
@@ -1332,10 +1333,14 @@ data = np.loadtxt(dfile,skiprows=1,usecols=(2,3,8))
 #Class II -1.6 <= alpha < - 0.3
 #Class III alpha < -1.6
 
+##Make masks for source classification
+tbol_data = data[:,3]
+agb_mask = agb_data == 'N'
+
 #combine class masks into one 3d array
-class01_mask = data[:,2] >= 0.3
-flat_mask = (-0.3 <= data[:,2]) & (data[:,2] < 0.3)
-class2_mask = (-1.6 <= data[:,2]) & (data[:,2] < -0.3)
+class01_mask = (data[:,2] >= 0.3) & (tbol_data < 650)
+flat_mask = (-0.3 <= data[:,2]) & (data[:,2] < 0.3) & (tbol_data >= 100)
+class2_mask = (-1.6 <= data[:,2]) & (data[:,2] < -0.3) & (tbol_data >= 100)
 class3_mask = data[:,2] < -1.6
 all_mask = class01_mask+flat_mask+class2_mask+class3_mask
 
@@ -1355,7 +1360,7 @@ for a in range(4,5):
     coverage = cov.astype(bool)
     area_array = get_area_array()
     
-    total_mask = pos_mask & alpha_mask[a]
+    total_mask = pos_mask & alpha_mask[a] & agb_mask
     yso = data[total_mask,:2]
     yso = yso.T
     yso_map = yso_to_grid(yso)
