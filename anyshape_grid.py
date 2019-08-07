@@ -1281,7 +1281,7 @@ Coverage map.
 #fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
 #fits_path = '../SFR_data'
 fits_path = '.'
-fits_name = 'SER_IRAC1234M1_cov.fits'
+fits_name = 'PER_IRAC1234M1_cov.fits'
 coverage,header = fits.getdata(os.path.join(fits_path,fits_name), header=True)
 w_obj = wcs.WCS(header)
 
@@ -1303,10 +1303,10 @@ else:
 ##Extracting sections of map
 #desired sector of sky bottom-left and top-right.
 
-bounds = np.array([[277.4,277.6],[1.18,1.28]])
+bounds = np.array([[52,53],[31,32]])
 
 #number of processes
-noProcess = 1
+noProcess = 7
 w_obj,coverage = extract_region(bounds,w_obj,coverage)
 
 #Remove non-binary values from coverage map
@@ -1352,18 +1352,18 @@ pos_data = data[:,:2]
 pos_mask = (pos_data[:,0] > bounds[0,0]) & (pos_data[:,0] < bounds[0,1]) & (pos_data[:,1] > bounds[1,0]) & (pos_data[:,1] < bounds[1,1])
 
 
-region = 'serpens_core'
+region = 'ngc1333'
 fpath = '{:s}/'.format(region)
 class_list = ['classI0','flat','classII','classIII','all']
 #loop over each yso class
 
 tic = time.time()
-for a in range(4,5):
+for a in range(5):
     #reset coverage map for each yso class
     coverage = cov.astype(bool)
     area_array = get_area_array()
     
-    total_mask = pos_mask & alpha_mask[a] & agb_mask
+    total_mask = pos_mask & alpha_mask[a]
     yso = data[total_mask,:2]
     yso = yso.T
     yso_map = yso_to_grid(yso)
@@ -1409,7 +1409,7 @@ for a in range(4,5):
     
     #Get stats
     steps = 20
-    r = np.linspace(0.001,0.05,steps)
+    r = np.linspace(0.01,0.5,steps)
     w = r*0.6
 
     results = np.empty((2,steps))
