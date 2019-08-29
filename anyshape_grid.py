@@ -734,14 +734,18 @@ def gcircle(p1,p2):
     sep = np.arctan(s1/s2)
     return sep*180/np.pi
 
-def get_area_array(tan=True,grid=None,wcs_obj=None):
+def get_area_array(tan=True,grid=None,wcs_obj=None,dist=None):
     """
     Return the celestial pixel areas for each pixel
-    in the FITS file.
+    in the FITS file in the same units as crval.
     If tan projection, calculates celestial area by calculating
     great circle angle to each pixel and multiplying reference 
     pixel angle by plate scale cos**3(theta). See wikipedia
     gnomonic projection. 
+    
+    dist is the distance to the celestial sphere which when provided
+    is used to convert square degrees to [units]**2 where [units] are 
+    the units of dist.
 
     Else, assumes pixels are small and can be approximated 
     by rectangles rotated with respect to lines of const ra.
@@ -768,29 +772,16 @@ def get_area_array(tan=True,grid=None,wcs_obj=None):
         
         angles = gcircle((gx,gy),(ra_ref,dec_ref))
         ref_area = wcs.utils.proj_plane_pixel_area(wcs_obj)
-        return np.cos(d2r(angles))**3*ref_area*grid
-    else:
-        #Find RA and Dec at each grid coordinate
-        grx = np.arange(ra_axis+1)
-        gry = np.arange(dec_axis+1)
-        GX,GY = np.meshgrid(grx,gry,indexing='ij')
-        GX,GY = GX.flatten(), GY.flatten()
-        gry,grx = w_obj.all_pix2world(GY,GX,0)
-        grx, gry = grx.reshape(ra_axis+1,dec_axis+1), gry.reshape(ra_axis+1,dec_axis+1)
-        
-        #Find dRA_ij = RA_{i+1},j - RA_ij and likewise for dec
-        dRA = grx[1:ra_axis+1,:dec_axis]-grx[:ra_axis,:dec_axis]
-        dDec = gry[:ra_axis,1:dec_axis+1]-gry[:ra_axis,:dec_axis]
-        
-        #Due to rotation a step in grid changes both ra and dec.
-        #Calculate angle between lines of constant Ra and the
-        #grid at constant i.
-        dely = gry[1:ra_axis+1,:dec_axis]-gry[:ra_axis,:dec_axis]
-        theta = np.arctan(dely/dRA)
-        
-        angle_part = np.sin(np.pi/2-gry[:ra_axis,:dec_axis]*np.pi/180.0)
-        #celestial steradians for all pixels
-        return angle_part*(dRA*dDec)/(np.cos(theta)**2)
+
+        #if dist provided calculate real areas
+        if not dist is None:
+            ##convert reference pixel to radians squared
+            ref_radian = ref_area*(np.pi/180)**2
+            angular_areas = np.cos(d2r(angles))**3*ref_radian*grid
+            sintheta = np.sin(d2r(90-gy))
+            return dist**2*sintheta*angular_areas
+        else:
+            return np.cos(d2r(angles))**3*ref_area*grid
     
 def angle2box(xp,yp,t):
     """
