@@ -1269,10 +1269,17 @@ Array of grid centre coordinates.
 Coverage map.
 """
 
+region = 'serpens_south'
+bounds = np.array([[277.2, 277.7],[-2.25,-1.75]])
+fits_name = 'SERAQU_IRAC1234M1_cov.fits'
+ext_name='HGBS_aquilaM2_hires_column_density_map.fits'
+distance_to = 484
+steps = 20
+r = np.linspace(0.01,0.25,steps)
+
 #fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
 #fits_path = '../SFR_data'
 fits_path = '.'
-fits_name = 'PER_IRAC1234M1_cov.fits'
 coverage,header = fits.getdata(os.path.join(fits_path,fits_name), header=True)
 w_obj = wcs.WCS(header)
 
@@ -1294,8 +1301,6 @@ else:
 ##Extracting sections of map
 #desired sector of sky bottom-left and top-right.
 
-bounds = np.array([[52,53],[31,32]])
-
 #number of processes
 noProcess = 7
 w_obj,coverage = extract_region(bounds,w_obj,coverage)
@@ -1313,7 +1318,7 @@ ra_axis,dec_axis = np.shape(coverage)
 gx,gy = get_coords(w_obj,coverage)
 
 ##Getting pixel scales
-area_array = get_area_array()
+area_array = get_area_array(dist=distance_to)
 total_area = np.sum(area_array)
 
 ##Getting ysos
@@ -1343,7 +1348,6 @@ pos_data = data[:,:2]
 pos_mask = (pos_data[:,0] > bounds[0,0]) & (pos_data[:,0] < bounds[0,1]) & (pos_data[:,1] > bounds[1,0]) & (pos_data[:,1] < bounds[1,1])
 
 
-region = 'ngc1333'
 fpath = '{:s}/'.format(region)
 class_list = ['classI0','flat','classII','classIII','all']
 #loop over each yso class
@@ -1399,8 +1403,6 @@ for a in range(5):
     # plt.savefig('{:s}{:s}_{:s}_reduced_map.png'.format(fpath,region,class_list[a]))
     
     #Get stats
-    steps = 20
-    r = np.linspace(0.01,0.5,steps)
     w = r*0.6
 
     results = np.empty((2,steps))
