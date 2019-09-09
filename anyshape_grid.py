@@ -1236,8 +1236,15 @@ def extinction_prob(yso,avbins,area,density,wcs_obj=None):
     avbins is an array of the bin edges.
     wcs_obj is the wcs object for the density array.
     """
-    yso_dec,yso_ra = wcs_obj.all_world2pix(yso[1,:],yso[0,:],0)
-    ysoAv = density[yso_ra.astype('int'),yso_dec.astype('int')]
+    ## Check if fits file axes are (RA, Dec) or (Dec, RA).
+    h = wcs_obj.to_header()
+    if 'DEC' in h['CTYPE1']:
+        yso_dec,yso_ra = wcs_obj.all_world2pix(yso[1,:],yso[0,:],0)
+    else:
+        yso_ra,yso_dec = wcs_obj.all_world2pix(yso[0,:],yso[1,:],0)
+
+    yso_ra,yso_dec = np.round(yso_ra).astype('int'), np.round(yso_dec).astype('int')
+    ysoAv = density[yso_ra,yso_dec]
     yso_c = np.zeros(len(avbins)-1)
     area_c = np.zeros(len(avbins)-1)
     for i in range(len(avbins)):
