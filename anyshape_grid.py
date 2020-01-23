@@ -778,8 +778,7 @@ def get_area_array(tan=True,grid=None,wcs_obj=None,dist=None):
             ##convert reference pixel to radians squared
             ref_radian = ref_area*(np.pi/180)**2
             angular_areas = np.cos(d2r(angles))**3*ref_radian*grid
-            sintheta = np.sin(d2r(90-gy))
-            return dist**2*sintheta*angular_areas
+            return dist**2*angular_areas
         else:
             return np.cos(d2r(angles))**3*ref_area*grid
     
