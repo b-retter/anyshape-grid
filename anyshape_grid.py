@@ -159,7 +159,7 @@ def xy2grid(v1,v2,wcs_obj=None):
     if wcs_obj is None:
         wcs_obj = w_obj
 
-    if inverted == True:
+    if invertcheck(wcs_obj):
         j,i = wcs_obj.all_world2pix(v2,v1,0)
     else:
         i,j = wcs_obj.all_world2pix(v1,v2,0)
@@ -173,7 +173,7 @@ def ij2xy(i,j,wcs_obj=None):
     if wcs_obj is None:
         wcs_obj = w_obj
 
-    if inverted == True:
+    if invertcheck(wcs_obj):
         y,x = wcs_obj.all_pix2world(j,i,0)
     else:
         x,y = wcs_obj.all_pix2world(i,j,0)
@@ -194,7 +194,7 @@ def inside_check(v1,v2,wcs_obj=None):
         
     if wcs_obj is None:
         wcs_obj = w_obj
-    if inverted == True:
+    if invertcheck(wcs_obj):
         cdec,cra = wcs_obj.all_world2pix(v2,v1,0)
     else:
         cra,cdec = wcs_obj.all_world2pix(v1,v2,0)
@@ -756,8 +756,7 @@ def get_area_array(tan=True,grid=None,wcs_obj=None,dist=None):
     if wcs_obj is None:
         wcs_obj = w_obj
         
-    h = wcs_obj.to_header()
-    if 'DEC' in h['CTYPE1']:
+    if invertcheck(wcs_obj):
         inverted = True
         ra_ref = header['CRVAL2']
         dec_ref = header['CRVAL1']
@@ -923,14 +922,14 @@ def extract_region(bounds,wcs_obj,grid):
     """
     Extract rectangular section of coverage map designated by ra and dec coordinates.
     bounds = (2x2) array containing the boundaries of the desired section. [[Ra_0,Ra_1],[Dec_0,Dec_1]]
-    grid = array to be sliced using pixel coordinates given by wcs_obj.
+    grid = array to be sliced using pixel coordinates given by wcs_obj, dimensions must be (RA,Dec).
     """
     #coordinates of bottom-left and top-right corners of RA, Dec box.
     bl = (bounds[0,0],bounds[1,0])
     tr = (bounds[0,1],bounds[1,1])
     
     tl,br = (bl[0],tr[1]),(tr[0],bl[1])
-    if inverted:
+    if invertcheck(wcs_obj):
         dec_box,ra_box = wcs_obj.all_world2pix(np.array([bl[1],br[1],tl[1],tr[1]]),np.array([bl[0],br[0],tl[0],tr[0]]),0)
     else:
         ra_box,dec_box = wcs_obj.all_world2pix(np.array([bl[0],br[0],tl[0],tr[0]]),np.array([bl[1],br[1],tl[1],tr[1]]),0)
@@ -955,7 +954,7 @@ def extract_region(bounds,wcs_obj,grid):
     #according to astropy documentation the order of wcs slices "should be reversed (as for the data)
     #compared to the natural WCS order." Which I have interpreted to mean the second axes of the WCS
     #object is sliced using the first slice and vice versa.
-    if inverted:
+    if invertcheck(wcs_obj):
         wcs_obj = wcs_obj[int(ra_lims[0]):int(ra_lims[1]),int(dec_lims[0]):int(dec_lims[1])]
     else:
         wcs_obj = wcs_obj[int(dec_lims[0]):int(dec_lims[1]),int(ra_lims[0]):int(ra_lims[1])]
@@ -1177,7 +1176,7 @@ def resample_fits(wcs_obj1,grid1,wcs_obj2):
     
     h1 = wcs_obj1.to_header()
     naxis = wcs_obj1._naxis
-    if 'DEC' in h1['CTYPE1']:
+    if invertcheck(wcs_obj1):
         inv1 = True
         dec1 = naxis[0]
         ra1 = naxis[1]
@@ -1193,7 +1192,7 @@ def resample_fits(wcs_obj1,grid1,wcs_obj2):
 
     h2 = wcs_obj2.to_header()
     naxis = wcs_obj2._naxis
-    if 'DEC' in h2['CTYPE1']:
+    if invertcheck(wcs_obj2):
         inv2 = True
         dec2 = naxis[0]
         ra2 = naxis[1]
@@ -1265,6 +1264,19 @@ def extinction_prob(yso,avbins,area,density,wcs_obj=None):
             else:
                 map2[i,j] = prob[np.argmin((avbins-density[i,j])<0)-1]
     return map2
+
+def invertcheck(wcs_obj):
+    """
+    Checks if the axes are (RA, Dec) or (Dec, RA).
+    If the latter then the axes are considered 'inverted'.
+    Returns True if inverted. 
+    Returns False if not inverted.
+    """
+    h = wcs_obj.to_header()
+    if 'DEC' in h['CTYPE1']:
+        return True
+    else:
+        return False
 
 """
 Extract the relevant data from the fits file. 
