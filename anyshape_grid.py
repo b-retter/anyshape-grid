@@ -1278,6 +1278,65 @@ def invertcheck(wcs_obj):
     else:
         return False
 
+def get_yso_locs(bounds,yso_class,dpath=None):
+    """
+    When passed a set of boundaries returns the YSOs of desired classification using the corrected alpha values and the classification boundaries:
+    Class 0/I  alpha >= 0.3
+    Flat-spectrum -0.3 <= alpha < 0.3
+    Class II -1.6 <= alpha < - 0.3
+    Class III alpha < -1.6
+
+    bounds = 2x2 array of form [[RA0 RA1],[Dec0,Dec1]]
+    yso_class = string containing a class description from variable CLASS_LIST.
+    Currently:
+    class0I
+    flat
+    classII
+    classIII
+    all
+    
+    Returns 2xN array of YSO positions where rows contain RA and Dec respectively.
+    """
+    #provides dictionary keys
+    CLASS_LIST = ['class0I','flat','classII','classIII','all']
+    
+    if dpath is None:
+        dpath = '.'
+    
+    dunham = 'dunham15_tab_ysos_coords.txt'
+    yso_data = np.loadtxt(os.path.join(dpath,dunham),
+                          skiprows=1,usecols=(2,3,8,9))
+    agb_data = np.loadtxt(os.path.join(dpath,dunham),dtype='string',
+                              skiprows=1,usecols=(11,))
+
+
+    ##Make masks for source classification
+    tbol_data = yso_data[:,3]
+    agb_mask = agb_data == 'N'
+    pos_data = yso_data[:,:2]
+
+    #Make position mask
+    pos_mask = (pos_data[:,0] > bounds[0,0]) & (pos_data[:,0] < bounds[0,1]) & \
+        (pos_data[:,1] > bounds[1,0]) & (pos_data[:,1] < bounds[1,1])
+    
+    #Get masks for each class using corrected alpha
+    class01_mask = (yso_data[:,2] >= 0.3) & (tbol_data < 650)
+    flat_mask = (-0.3 <= yso_data[:,2]) & (yso_data[:,2] < 0.3) & (tbol_data >= 100)
+    class2_mask = (-1.6 <= yso_data[:,2]) & (yso_data[:,2] < -0.3) & (tbol_data >= 100)
+    class3_mask = yso_data[:,2] < -1.6
+    all_mask = class01_mask+flat_mask+class2_mask+class3_mask
+
+    #Collect class masks into dictionary
+    masks = {CLASS_LIST[0]:class01_mask&pos_mask,CLASS_LIST[1]:flat_mask&pos_mask,
+                 CLASS_LIST[2]:class2_mask&pos_mask,CLASS_LIST[3]:class3_mask&pos_mask,
+                 CLASS_LIST[4]:all_mask&pos_mask}
+
+    ysos = yso_data[masks[yso_class],:2]
+    ysos = ysos.T
+    yso_map = yso_to_grid(ysos)
+
+    return ysos, yso_map
+
 """
 Extract the relevant data from the fits file. 
 Array size.
@@ -1339,33 +1398,8 @@ gx,gy = get_coords(w_obj,coverage)
 area_array = get_area_array(dist=distance_to)
 total_area = np.sum(area_array)
 
-##Getting ysos
-dfile = 'dunham15_tab_ysos_coords.txt'
-data = np.loadtxt(dfile,skiprows=1,usecols=(2,3,8,9))
-agb_data = np.loadtxt(dfile,dtype='string',skiprows=1,usecols=(11,))
 
-#Class limits with corrected alpha 
-#Class 0/I  alpha >= 0.3
-#Flat-spectrum -0.3 <= alpha < 0.3
-#Class II -1.6 <= alpha < - 0.3
-#Class III alpha < -1.6
-
-##Make masks for source classification
-tbol_data = data[:,3]
-agb_mask = agb_data == 'N'
-
-#combine class masks into one 3d array
-class01_mask = (data[:,2] >= 0.3) & (tbol_data < 650)
-flat_mask = (-0.3 <= data[:,2]) & (data[:,2] < 0.3) & (tbol_data >= 100)
-class2_mask = (-1.6 <= data[:,2]) & (data[:,2] < -0.3) & (tbol_data >= 100)
-class3_mask = data[:,2] < -1.6
-all_mask = class01_mask+flat_mask+class2_mask+class3_mask
-
-alpha_mask = np.array([class01_mask,flat_mask,class2_mask,class3_mask,all_mask])
-pos_data = data[:,:2]
-pos_mask = (pos_data[:,0] > bounds[0,0]) & (pos_data[:,0] < bounds[0,1]) & (pos_data[:,1] > bounds[1,0]) & (pos_data[:,1] < bounds[1,1])
-
-
+    
 fpath = '{:s}/'.format(region)
 class_list = ['classI0','flat','classII','classIII','all']
 #loop over each yso class
@@ -1375,11 +1409,9 @@ for a in range(5):
     #reset coverage map for each yso class
     coverage = cov.astype(bool)
     area_array = get_area_array()
-    
-    total_mask = pos_mask & alpha_mask[a]
-    yso = data[total_mask,:2]
-    yso = yso.T
-    yso_map = yso_to_grid(yso)
+
+    get_yso_locs(bounds,class_list[a],dpath=None)
+
     
     # #save image of each coverage map
     # plt.figure()
