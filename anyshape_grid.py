@@ -1354,15 +1354,18 @@ distance_to = 484
 steps = 20
 r = np.linspace(0.01,0.25,steps)
 
-#fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
+#number of processes
+noProcess = 7
+
+fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
 #fits_path = '../SFR_data'
-fits_path = '.'
+#fits_path = '.'
 coverage,header = fits.getdata(os.path.join(fits_path,fits_name), header=True)
 w_obj = wcs.WCS(header)
 
 ##Find which axis is RA and which is Dec.
-##inverted kayword defines if axes are RA and Dec or
-##Dec and RA.
+##inverted kayword defines if axes are RA and Dec (not inverted) or
+##Dec and RA (inverted).
 if 'DEC' in header['CTYPE1']:
     inverted = True
     dec_axis = header['NAXIS1']
@@ -1377,17 +1380,12 @@ else:
 
 ##Extracting sections of map
 #desired sector of sky bottom-left and top-right.
-
-#number of processes
-noProcess = 7
 w_obj,coverage = extract_region(bounds,w_obj,coverage)
 
-#Remove non-binary values from coverage map
+#Remove non-binary values from coverage map and store as boolean.
 cov = np.zeros(np.shape(coverage))
 cov += coverage == 1
-
 coverage = cov.astype(bool)
-#cov = None
 
 ra_axis,dec_axis = np.shape(coverage)
 
@@ -1398,71 +1396,28 @@ gx,gy = get_coords(w_obj,coverage)
 area_array = get_area_array(dist=distance_to)
 total_area = np.sum(area_array)
 
-
-    
-fpath = '{:s}/'.format(region)
 class_list = ['classI0','flat','classII','classIII','all']
 #loop over each yso class
 
 tic = time.time()
-for a in range(5):
+for cl in class_list:
     #reset coverage map for each yso class
     coverage = cov.astype(bool)
     area_array = get_area_array()
 
-    get_yso_locs(bounds,class_list[a],dpath=None)
+    #extract ysos
+    yso, yso_map = get_yso_locs(bounds,cl,dpath=None)
 
-    
-    # #save image of each coverage map
-    # plt.figure()
-    # plt.pcolormesh(gx,gy,coverage)
-    # plt.plot(yso[0,:],yso[1,:],'*')
-    # plt.xlabel('RA')
-    # plt.ylabel('Dec')
-    # plt.title('Non-reduced coverage map for {:s} {:s} YSOs'.format(region,class_list[a]))
-    # plt.axis('equal')
-    # plt.savefig('{:s}{:s}_{:s}_map.png'.format(fpath,region,class_list[a]))
-
-    # #uncomment to perform map reduction
-    # #First pass
-    # p0=0.01
-    # lmda = np.sum(yso_map)/get_area()
-    # wmin = -np.log(p0)/lmda
-    # L_sqrd = wmin/total_area*np.size(coverage)
-    # L = np.sqrt(L_sqrd)
-    # coverage,yso_map = reduce_map(coverage,yso_map,int(1.5*L),p0,0,True)
-    # area_array = get_area_array()
-
-    # #Second pass
-    # p0=0.01
-    # lmda = np.sum(yso_map)/get_area()
-    # wmin = -np.log(p0)/lmda
-    # L_sqrd = wmin/total_area*np.size(coverage)
-    # L = np.sqrt(L_sqrd)
-    # coverage,yso_map = reduce_map(coverage,yso_map,L,p0,1,True)
-    # area_array = get_area_array()
-
-    # #save image of each reduced coverage map
-    # plt.figure()
-    # plt.pcolormesh(gx,gy,coverage)
-    # plt.plot(yso[0,:],yso[1,:],'*')
-    # plt.xlabel('RA')
-    # plt.ylabel('Dec')
-    # plt.title('Reduced coverage map for {:s} {:s} YSOs'.format(region,class_list[a]))
-    # plt.axis('equal')
-    # plt.savefig('{:s}{:s}_{:s}_reduced_map.png'.format(fpath,region,class_list[a]))
-    
     #Get stats
     w = r*0.6
-
     results = np.empty((2,steps))
     for i,v in enumerate(r):
         w_i = w[i]
         o,oo = Oring(yso[0,:],yso[1,:],v,w_i,yso_map,coverage,noP=noProcess)
-        k,kk = kfunc(yso[0,:],yso[1,:],v,yso_map,coverage,noP=noProcess)
+        #k,kk = kfunc(yso[0,:],yso[1,:],v,yso_map,coverage,noP=noProcess)
+        
         results[0,i] = oo
-        results[1,i] = kk
-
+        
         #estimate time remaining
         toc = time.time()
         cur = 1+i+a*steps
@@ -1470,26 +1425,6 @@ for a in range(5):
         est = (toc-tic)/(60.0*cur) * (len(class_list)*steps-cur) #estimates the time left for code to run
         print('%f%% complete: ~ %f more minutes' %(completed,est))
 
-    np.save('{:s}{:s}_{:s}_stats'.format(fpath,region,class_list[a]),results)
-    #np.save('{:s}{:s}_{:s}_map'.format(fpath,region,class_list[a]),coverage)
-    
-#coverage = clean_map(coverage,60,p0)
-#area_array = get_area_array()
-#plt.figure()
-#plt.pcolormesh(gx,gy,coverage)
-#plt.plot(yso[0,:],yso[1,:],'*')
-#plt.axis('equal')
-
-#p0=0.01
-#lmda = np.sum(yso_map)/get_area()
-#wmin = -np.log(p0)/lmda
-#L_sqrd = wmin/get_area()*np.size(coverage)
-#coverage,yso_map = reduce_map(coverage,yso_map,np.sqrt(L_sqrd),p0,True)
-#area_array = get_area_array()
-
-#plt.figure()
-#plt.pcolormesh(gx,gy,coverage)
-#plt.plot(yso[0,:],yso[1,:],'*')
-#plt.axis('equal')
-
-#plt.show()
+    fpath = '{:s}/'.format(region)
+    fname = '{:s}{:s}_{:s}_stats'.format(fpath,region,cl)
+    np.save(os.path.join(fpath,fname),results)
