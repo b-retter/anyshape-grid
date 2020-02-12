@@ -1139,65 +1139,39 @@ def foi_map(grid,yso_map,L):
             
     return lmda_map
 
-def resample_fits(wcs_obj1,grid1,wcs_obj2):
+def resample_fits(astro_obj_data,astro_obj_footprint):
     """
-    Resample the data from one wcs object into the size and shape of another wcs object.
-    wcs_obj1 is the first wcs object.
-    grid1 is the data from wcs_obj1
-    wcs_obj2 is the second wcs object.
-    """
-    ##Find which axis is RA and which is Dec for each wcs object
-    ##inverted kayword defines if axes are RA and Dec or
-    ##Dec and RA.
+    A naive function for extracting the footprint on the sky of one wcs object's data array from another wcs object.    
     
-    h1 = wcs_obj1.to_header()
-    naxis = wcs_obj1._naxis
-    if invertcheck(wcs_obj1):
-        inv1 = True
-        dec1 = naxis[0]
-        ra1 = naxis[1]
-    else:
-        inv1 = False    
-        ra1 = naxis[0]
-        dec1 = naxis[1]
+    astro_obj_data is the astro_box which contains the data.
+    astro_obj_footprint is the astro_box to be used as a reference.
 
-    #if the data is not (ra,dec) transpose the array
-    if grid1.shape[0] != ra1 and grid1.shape[1] != dec1:
-        print('Data does not appear to have axes (ra,dec). Trying with transpose.')
-        grid1 = grid1.T
+    returns a new astro_box that is a deep copy of astro_obj_footprint except
+    its grid is the new grid.
+    """
+    
+    #use the world coordinates for astro_obj_footprint to fill in an empty array
 
-    h2 = wcs_obj2.to_header()
-    naxis = wcs_obj2._naxis
-    if invertcheck(wcs_obj2):
-        inv2 = True
-        dec2 = naxis[0]
-        ra2 = naxis[1]
-    else:
-        inv2 = False    
-        ra2 = naxis[0]
-        dec2 = naxis[1]
+    #flatten the coordinates
+    ra_foot, dec_foot = astro_obj_footprint.RA, astro_obj_footprint.Dec
+    ra_foot, dec_foot = ra_foot.flatten(), dec_foot.flatten()
+
+    ra,dec = astro_obj_data.xy2grid(ra_foot,dec_foot)
 
     #get the world coordinates for wcs_obj2
-    gx = np.arange(ra2)
-    gy = np.arange(dec2)
+    gx = np.arange(astro_obj_footprint.ra_axis)
+    gy = np.arange(astro_obj_footprint.dec_axis)
         
     GX,GY = np.meshgrid(gx,gy,indexing='ij')
     GX,GY = GX.flatten(), GY.flatten()
-    if inv2:
-        gy,gx = wcs_obj2.all_pix2world(GY,GX,0)
-    else:
-        gx,gy = wcs_obj2.all_pix2world(GX,GY,0)
-
-    #find the grid coordinates in wcs_obj1 for each pixel in wcs_obj2
-    if inv1:
-        gy1,gx1 = wcs_obj1.all_world2pix(gy,gx,0)
-    else:
-        gx1,gy1 = wcs_obj1.all_world2pix(gx,gy,0)
-
-    grid2 = np.empty((ra2,dec2))
-    grid2[GX,GY] = grid1[gx1.astype('int'),gy1.astype('int')] 
     
-    return grid2
+    #make and repopulate new grid
+    new_grid = np.empty(astro_obj_footprint.grid.shape)
+    new_grid[GX,GY] = astro_obj_data.grid[ra,dec]
+
+    new_astro_obj = copy.deepcopy(astro_obj_footprint)
+    new_astro_obj.grid = new_grid
+    return new_astro_obj
 
 def extinction_prob(yso,avbins,astro_obj,col_density):
     """
@@ -1316,7 +1290,7 @@ class astro_box(object):
     astro_box is designed to combine all of the relevant bits of information
     required to make anyshape_grid work smoothly.
     """
-    def __init__(self,fits_file,bounds=None):
+    def __init__(self,fits_file,bounds=None,get_coords=True):
         """
         Set up some available constants from FITS file.
         """
@@ -1342,7 +1316,8 @@ class astro_box(object):
         if not bounds is None:
             self.extract_region(bounds)
 
-        self.get_coords()
+        if get_coords:
+            self.get_coords()
             
         return None
             
@@ -1500,7 +1475,7 @@ class astro_box(object):
         else:
             i,j = self.wcs_obj.all_world2pix(v1,v2,0)
 
-        return int(np.round(i)),int(np.round(j))
+        return np.round(i).astype('int'),np.round(j).astype('int')
 
     def angle2box(self,xp,yp,t):
         """
