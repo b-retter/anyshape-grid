@@ -1316,10 +1316,13 @@ class astro_box(object):
     astro_box is designed to combine all of the relevant bits of information
     required to make anyshape_grid work smoothly.
     """
-    def __init__(self,fits_file):
+    def __init__(self,fits_file,bounds=None):
+        """
+        Set up some available constants from FITS file.
+        """
         self.grid,self.header = fits.getdata(fits_file, header=True)
         self.wcs_obj = wcs.WCS(self.header)
-
+        
         #Find which axis is RA and which is Dec
         if 'DEC' in self.header['CTYPE1']:
             self.inverted=True
@@ -1334,8 +1337,15 @@ class astro_box(object):
             self.dec_axis = self.header['NAXIS2']
             self.dec_ref = self.header['CRVAL2']
             self.ra_ref = self.header['CRVAL1']
+
+        #if a value has been provided to bounds extract the region
+        if not bounds is None:
+            self.extract_region(bounds)
+
+        self.get_coords()
             
         return None
+            
     def reset_shape(self):
         """
         reset axes shapes values.
@@ -1584,65 +1594,3 @@ class astro_box(object):
         dists = gcircle((self.RA[il:ir,jl:jr],self.Dec[il:ir,jl:jr]),(xp,yp))
         co_x,co_y = np.where((dists <= R) & (self.grid[il:ir,jl:jr] == 1))
         return np.array([co_x+il,co_y+jl])
-    
-"""
-Extract the relevant data from the fits file. 
-Array size.
-Make a wcs object.
-Array of grid square coordinates.
-Array of grid centre coordinates.
-Coverage map.
-"""
-
-region = 'serpens_south'
-bounds = np.array([[277.2, 277.7],[-2.25,-1.75]])
-fits_name = 'SERAQU_IRAC1234M1_cov_sm.fits'
-ext_name='HGBS_aquilaM2_hires_column_density_map.fits'
-distance_to = 484
-steps = 2
-r = np.linspace(0.01,0.25,steps)
-
-#number of processes
-noProcess = 1
-
-#fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
-fits_path = '../../SFR_data'
-#fits_path = '.'
-fits_file = os.path.join(fits_path,fits_name)
-w_obj = astro_box(fits_file)
-
-##Extracting sections of map
-#desired sector of sky bottom-left and top-right.
-w_obj.extract_region(bounds)
-
-#Remove non-binary values from coverage map and store as boolean.
-w_obj.booleanise()
-
-##Getting celestial coordinates of pixel centres
-w_obj.get_coords()
-
-##Getting pixel scales
-area_array = w_obj.get_area_array(dist=distance_to)
-total_area = np.sum(area_array)
-
-class_list = ['class0I','flat','classII','classIII','all']
-#loop over each yso class
-
-tic = time.time()
-for a,cl in enumerate(class_list):
-    if a > 0:
-        break
-    #extract ysos
-    yso = get_yso_locs(bounds,cl,dpath='..')
-    yso_map = yso_to_grid(yso,w_obj,yso_return=False)
-    
-    #Get stats
-    w = r*0.6
-    results = np.empty((2,steps))
-    for i,v in enumerate(r):
-        w_i = w[i]
-        o,oo = Oring(yso[0,:],yso[1,:],v,w_i,w_obj,yso_map,noP=noProcess)
-        k,kk = kfunc(yso[0,:],yso[1,:],v,w_obj,yso_map,noP=noProcess)
-        
-        results[0,i] = oo
-        results[1,i] = kk
