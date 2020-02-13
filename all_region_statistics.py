@@ -6,7 +6,7 @@ from anyshape_grid import *
 Steps:
 Make astro_box object using fits_file
 """
-noProcesses = 10
+noProcess = 10
 steps = 20
 LOOPS = 99
 
@@ -15,9 +15,9 @@ LOOPS = 99
 fpath = '.'
 
 #directory containing fits files
-fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
+#fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
 #fits_path = '../../SFR_data'
-#fits_path = '.'
+fits_path = 'HERSCHEL_SPITZER'
 
 allregions = ['serpens_south','serpens_core','ophiuchus','ngc1333','ic348']
 alldistances = [484,484,144,293,321]
@@ -63,7 +63,7 @@ for j,region in enumerate(allregions):
         if a > 0:
             break
         #extract ysos
-        yso = get_yso_locs(bounds,cl,dpath='..')
+        yso = get_yso_locs(bounds,cl,dpath='.')
         yso_map = yso_to_grid(yso,w_obj,yso_return=False)
 
         #Get stats
