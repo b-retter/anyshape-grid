@@ -8,7 +8,6 @@ Make astro_box object using fits_file
 """
 noProcess = 10
 steps = 20
-LOOPS = 99
 
 #directory for saving stats
 #fpath = '/Users/bretter/Documents/StarFormation/RandomDistribution/Grid Based Spatial Stats/Data/SFR_stats'
