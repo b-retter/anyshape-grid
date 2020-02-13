@@ -16,7 +16,7 @@ bounds = np.array([[277.2, 277.7],[-2.25,-1.75]])
 fits_name = 'SERAQU_IRAC1234M1_cov_sm.fits'
 ext_name='HGBS_aquilaM2_hires_column_density_map.fits'
 distance_to = 484
-steps = 20
+steps = 10
 r = np.linspace(0.01,0.25,steps)
 
 fits_path = '/Users/bretter/Documents/StarFormation/SFR_data'
@@ -35,39 +35,40 @@ w_obj.get_area_array(dist=distance_to)
 extinction_fits = os.path.join(fits_path,ext_name)
 ext_obj = astro_box(extinction_fits,get_coords=False)
 
-ext_obj = resample_fits2(ext_obj,w_obj)
+ext_obj = resample_fits(ext_obj,w_obj)
+ext_obj.extract_region(bounds)
 
-# ##Initialise envelope
-# noProcesses = 30
+##Initialise envelope
+noProcesses = 4
 
-# #loop over each yso class
-# tic = time.time()
-# fpath = '{:s}/'.format(region)
-# class_list = ['classI0','flat','classII','classIII','all']
-# for a,cl in enumerate(class_list):
+#loop over each yso class
+tic = time.time()
+fpath = '{:s}/'.format(region)
+class_list = ['class0I','flat','classII','classIII','all']
+for a,cl in enumerate(class_list):
 
-#     #extract ysos
-#     yso, yso_map = get_yso_locs(bounds,cl,dpath=None)
+    if a > 0:
+        break
+    #extract ysos
+    yso = get_yso_locs(bounds,cl,dpath='..')
     
-#     steps = 20
-#     w = 0.6*r
-#     val = int(np.shape(yso)[1])
+    steps = 20
+    w = 0.6*r
+    val = int(np.shape(yso)[1])
+    prob_map = ext_obj.grid**2.05
     
-#     #produce bin edges
-#     binss = [np.log10(1e20),np.log10(np.max(lmda_map)),11]
-#     binss = np.logspace(*binss)
-#     map2 = extinction_prob(yso,binss,area_array,lmda_map,w_obj)
+    #produce bin edges
+    binss = [np.log10(1e20),np.log10(np.max(prob_map)),11]
+    binss = np.logspace(*binss)
+
+    rnd.seed(1)
+
     
-#     LOOPS = 99
-#     results = allenv(val,r,w,LOOPS,mode='nhpp',noP=noProcesses,grid=coverage,density=map2,timer=False)
-
-#     #estimate time remaining
-#     toc = time.time()
-#     cur = 1+a
-#     completed = cur/float(len(class_list))*100
-#     est = ((toc-tic)/60.0)*(float(len(class_list))/cur -1) #estimates the time left for code to run
-#     print('{:s} complete: ~ {:.3f} more minutes'.format(cl,est))
-
-#     np.save('{:s}{:s}_{:s}_herschel_probmap_extinction_nhpp.npy'.format(fpath,region,cl),results)
-
-
+    LOOPS = 20
+    results = np.empty((LOOPS,2,val))
+    for i in range(LOOPS):
+        yso,yso_map = random_ysos(val,w_obj,'nhpp',prob_map)
+        results[i,:,:] = yso
+        
+    #results = allenv(val,r,w,LOOPS,w_obj,ext_obj.grid,mode='nhpp',noP=noProcesses,timer=False)
+np.save('../new_random_yso',results)

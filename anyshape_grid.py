@@ -808,9 +808,9 @@ def collate(results):
         array[:,i,:] = np.array(results[i].get())
     return array
 
-def run_csr(val,r,w,astro_obj,mode='sphere_binomial',noP=None,density=None):
+def run_csr(val,r,w,astro_obj,density=None,mode='sphere_binomial',noP=None):
     """
-    Perform desired number of runs get Oring and Kfunc data for CSR envelopes.
+    Perform desired number of runs get Oring and Kfunc data for envelopes.
     r is array of radial distances
     w is either single value or array of bin widths
     noP is number of desired workers to parallelise Oring and K seperately.
@@ -837,37 +837,49 @@ def run_csr(val,r,w,astro_obj,mode='sphere_binomial',noP=None,density=None):
     
     return results
 
-def allenv(val,r,w,LOOPS,astro_obj,mode='sphere_binomial',noP=None,density=None,timer=False):
+def allenv(val,r,w,LOOPS,astro_obj,density=None,mode='sphere_binomial',noP=None,timer=False):
     """
-    perform the LOOPS number of realisations using multiprocessing 
-    for increased speed producing results which can then be processed 
-    into confidence envelopes for csr.
-    """
-        
-    if noP > 1:
-        #initialise multiprocessing pool with desired number of processes
-        pool = mp.Pool(noP)
-        results = []
-        for loop in range(LOOPS):
-            #if timer requested
-            if timer:
-                results.append(pool.apply_async(run_csr,(val,r,w,astro_obj,mode,None,density),callback=callbackTimer))
-            else:
-                results.append(pool.apply_async(run_csr,(val,r,w,astro_obj,mode,None,density)))
-                
-        final_results = np.empty((2,LOOPS,len(r)))
-        for loop in range(LOOPS):
-            final_results[:,loop,:] = results[loop].get()
-    elif noP == 1 or noP == None:
-        start = time.time()
-        final_results = np.empty((2,LOOPS,len(r)))
-        for loop in range(LOOPS):
-            final_results[:,loop,:] = run_csr(val,r,w,astro_obj,mode,None,density)
+    Perform the LOOPS number of realisations of a first-order spatial point
+    process and pass those to the Oring and Ripley's K functions.
+    
+    noP = number of processes which can be used for multiprocessing.
 
-            #estimate the time left for code to run
-            completed = loop/float(LOOPS)*100
-            est = (time.time()-start)/(60.0*loop) * (LOOPS-loop) 
-            print('%f%% complete: ~ %f more minutes' %(completed,est))
+    Returns:
+    final_results: a set of measurements of realisations which can then be 
+    processed into confidence envelopes.
+    """
+
+    #if density is not supplied use the grid from astro_obj
+    if density is None:
+        density = astro_obj.grid
+
+    #stop warnings about wcs transformation axes.
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        if noP > 1:
+            #initialise multiprocessing pool with desired number of processes
+            pool = mp.Pool(noP)
+            results = []
+            for loop in range(LOOPS):
+                #if timer requested
+                if timer:
+                    results.append(pool.apply_async(run_csr,(val,r,w,astro_obj,density,mode,None),callback=callbackTimer))
+                else:
+                    results.append(pool.apply_async(run_csr,(val,r,w,astro_obj,density,mode,None)))
+
+            final_results = np.empty((2,LOOPS,len(r)))
+            for loop in range(LOOPS):
+                final_results[:,loop,:] = results[loop].get()
+        elif noP == 1 or noP == None:
+            start = time.time()
+            final_results = np.empty((2,LOOPS,len(r)))
+            for loop in range(LOOPS):
+                final_results[:,loop,:] = run_csr(val,r,w,astro_obj,density,mode,None)
+
+                #estimate the time left for code to run
+                completed = loop/float(LOOPS)*100
+                est = (time.time()-start)/(60.0*loop) * (LOOPS-loop) 
+                print('%f%% complete: ~ %f more minutes' %(completed,est))
     return final_results
 
 def get_coords(wcs_obj,grid,centre=True):
@@ -1173,24 +1185,35 @@ def resample_fits(astro_obj_data,astro_obj_footprint):
     new_astro_obj.grid = new_grid
     return new_astro_obj
 
-def extinction_prob(yso,avbins,astro_obj,col_density):
+def extinction_prob(yso,avbins,astro_obj,col_density=None):
     """
-    extinction_prob finds the probability that a pixel with a given extinction is likely to contain a YSO.
-    This is calculated by binning the extinction values and counting the both the number of YSOs within 
-    pixels of that extinction value as well as the total amount of area within that range of values.
-    yso is an array containing the world coordinate locations of the ysos of interest.
-    density is the 2d array containing the current probabilities of yso placement at each
+    extinction_prob finds the probability that a pixel with a given extinction
+    is likely to contain a YSO using a simple binning method.
+
+    This is calculated by binning the extinction values and counting the both
+    the number of YSOs within 
+    pixels of that extinction value as well as the total amount of area within 
+    that range of values.
+    yso is an array containing the world coordinate locations of the ysos of 
+    interest.
+    density is the 2d array containing the current probabilities of yso 
+    placement at each
     position in the array.
     avbins is an array of the bin edges.
     wcs_obj is the wcs object for the density array.
-    """
-    ## Check if fits file axes are (RA, Dec) or (Dec, RA).
-    if astro_obj.inverted:
-        yso_dec,yso_ra = astro_obj.wcs_obj.all_world2pix(yso[1,:],yso[0,:],0)
-    else:
-        yso_ra,yso_dec = astro_obj.wcs_obj.all_world2pix(yso[0,:],yso[1,:],0)
 
-    yso_ra,yso_dec = np.round(yso_ra).astype('int'), np.round(yso_dec).astype('int')
+    If col_density is None then assume the astro_box object's grid attribute is 
+    a column density map.
+
+    Returns prob_map: a 2d array that is a map of the probabilities of finding a    YSO.
+    """
+
+    if col_density is None:
+        col_density = astro_obj.grid
+
+    #get grid coordinates for YSOs RA and Dec 
+    yso_ra,yso_dec = astro_obj.xy2grid(yso[0,:],yso[1,:])
+    
     ysoAv = col_density[yso_ra,yso_dec]
     yso_c = np.zeros(len(avbins)-1)
     area_c = np.zeros(len(avbins)-1)
@@ -1205,14 +1228,14 @@ def extinction_prob(yso,avbins,astro_obj,col_density):
     prob[np.isnan(prob)] = 0
 
     shape = col_density.shape
-    map2 = np.empty(shape)
+    prob_map = np.empty(shape)
     for i in range(shape[0]):
         for j in range(shape[1]):
             if col_density[i,j] == 0:
-                map2[i,j] = 0
+                prob_map[i,j] = 0
             else:
-                map2[i,j] = prob[np.argmin((avbins-density[i,j])<0)-1]
-    return map2
+                prob_map[i,j] = prob[np.argmin((avbins-density[i,j])<0)-1]
+    return prob_map
 
 def invertcheck(wcs_obj):
     """
