@@ -12,7 +12,7 @@ Array of grid centre coordinates.
 Coverage map.
 """
 
-noProcesses = 10
+noProcesses = 15
 steps = 20
 LOOPS = 99
 
@@ -71,9 +71,20 @@ for j,region in enumerate(allregions):
 
     ext_obj = resample_fits(ext_obj,w_obj)
     ext_obj.extract_region(bounds)
+
+
+    #remove any values that are negative...
+    if np.any(ext_obj.grid < 0):
+        print('negative numbers present')
+        zeroes = np.where(ext_obj.grid < 0)
+        ext_obj.grid[zeroes] = 0
+        w_obj.grid[zeroes] = 0
+
+    prob_map = ext_obj.grid**2.052
     
     r = all_r[j]
     distance_to = alldistances[j]
+
     
     ##Initialise envelope
     #loop over each yso class
@@ -86,12 +97,10 @@ for j,region in enumerate(allregions):
         yso = get_yso_locs(bounds,cl,dpath='.')
         w = 0.6*r
         val = int(np.shape(yso)[0])
-
-        prob_map = ext_obj.grid
         
         results = allenv(val,r,w,LOOPS,w_obj,density=prob_map,mode='nhpp',noP=noProcesses,timer=False)
 
-        statsfile='{:s}_{:s}_beta1_envelope'.format(region,cl)
+        statsfile='{:s}_{:s}_beta2.052_envelope'.format(region,cl)
         statsdir = os.path.join(fpath,region,statsfile)
         np.save(statsdir,results)
 
