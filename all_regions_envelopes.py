@@ -96,7 +96,7 @@ for j,region in enumerate(allregions):
         #extract ysos
         yso = get_yso_locs(bounds,cl,dpath='.')
         w = 0.6*r
-        val = int(np.shape(yso)[0])
+        val = int(np.shape(yso)[1])
         
         results = allenv(val,r,w,LOOPS,w_obj,density=prob_map,mode='nhpp',noP=noProcesses,timer=False)
 
