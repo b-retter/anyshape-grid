@@ -78,7 +78,7 @@ for j,region in enumerate(allregions):
 
         #Get stats
         w = r*0.6
-        results = np.empty((2,steps))
+        results = np.empty((2,len(r)))
         for i,v in enumerate(r):
             w_i = w[i]
             o,oo = Oring(yso[0,:],yso[1,:],v,w_i,w_obj,yso_map,noP=noProcess)
