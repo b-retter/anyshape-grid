@@ -39,6 +39,7 @@ all_r = np.stack([np.linspace(0.25/steps,0.25,steps),
                       np.linspace(0.3/steps,0.3,steps)],axis=0)
 
 #Prep for finding r steps in terms of parsecs
+#define maximum distances in degrees and size of parsec steps.
 max_r_values = np.array([0.25,0.05,0.7,0.5,0.3])
 pc_step = 0.03
 
