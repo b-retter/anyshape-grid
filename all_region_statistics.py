@@ -38,6 +38,10 @@ all_r = np.stack([np.linspace(0.25/steps,0.25,steps),
                       np.linspace(0.5/steps,0.5,steps),
                       np.linspace(0.3/steps,0.3,steps)],axis=0)
 
+#Prep for finding r steps in terms of parsecs
+max_r_values = np.array([0.25,0.05,0.7,0.5,0.3])
+pc_step = 0.03
+
 for j,region in enumerate(allregions):
     print('{:s}'.format(region))
     fits_name = allfits_names[j]
@@ -51,8 +55,14 @@ for j,region in enumerate(allregions):
     ##Getting pixel scales
     w_obj.get_area_array(dist=alldistances[j])
     
-    r = all_r[j]
     distance_to = alldistances[j]
+
+    #Recalculate radial distances by converting to parsecs, finding the steps in parsecs
+    #and converting them back into angles.
+    conversion_factor = distance_to*(np.pi/180)
+    max_r_pc = max_r_values[j]*conversion_factor
+    r_pc = np.arange(pc_step,max_r_pc,pc_step)
+    r = r_pc/conversion_factor
     
     ##Initialise envelope
     #loop over each yso class
@@ -76,7 +86,7 @@ for j,region in enumerate(allregions):
             results[0,i] = oo
             results[1,i] = kk
 
-        statsfile='{:s}_{:s}_statistics'.format(region,cl)
+        statsfile='{:s}_{:s}_0.03pc_statistics'.format(region,cl)
         statsdir = os.path.join(fpath,region,statsfile)
         np.save(statsdir,results)
         
