@@ -13,11 +13,15 @@ from scipy.special import factorial
 import warnings
 import copy
 
-#/Users/bretter/Documents/StarFormation/RandomDistribution/spatialStats/Functions
-#sys.path.append('/Users/bretter/Documents/StarFormation/RandomDistribution/spatialStats/Functions')
-#import allstats as alls
 from timeit import default_timer as timer
 
+
+"""
+==================================================================
+Old functions -- probably not going to be used any more.
+They could probably be deleted.
+==================================================================
+"""
 def num_to_step(num):
     """
     converts number 1 to 4 into a step in either x or y direction
@@ -25,6 +29,10 @@ def num_to_step(num):
         1     3
            4
     """
+
+    print('deprecated function -- ignore.')
+    return None
+    
     if num == 1:
         return np.array([-1,0])
     elif num == 2:
@@ -40,12 +48,17 @@ def is_wall(current,step,grid):
     current = array([x,y])
     step = array([x,y])
     """
+    
+    print('deprecated function -- ignore.')
+    return None
+    
     dim = np.shape(grid)
     stepped = current+step
     if np.any(stepped < 0) or stepped[0] > dim[0]-1 or stepped[1] > dim[1]-1:
         return True
     else:
         return False
+    
 def box_check(xg,yg,Lx,Ly=None,grid=None):
     """
     Checks if there are any cells not covered by coverage map, or
@@ -53,6 +66,10 @@ def box_check(xg,yg,Lx,Ly=None,grid=None):
     centered on xg,yg.
     Returns False if not entirely within map.
     """
+
+    print('deprecated function -- ignore.')
+    return None
+    
     if grid is None:
         grid = coverage
     if Ly is None:
@@ -81,7 +98,11 @@ def circle_check(xp,yp,R,grid=None):
     centered on xp,yp.
     Returns False if not entirely within map.
     """
-        
+
+    print('deprecated function -- ignore.')
+    return None
+
+    
     if grid is None:
         grid = coverage
 
@@ -111,6 +132,9 @@ def make_grid(n_areas,n_length,n_height):
     generates an arbitrary shaped region through random walking starting in the centre
     """
 
+    print('deprecated function -- ignore.')
+    return None
+    
     def b_condition(loc,step):
         if is_wall(loc,step,grid):
             # if it is a wall, add the length or height of the grid
@@ -186,7 +210,7 @@ def delDist2Grid(v2,v1=0,axis=None):
         return int((v2-v1)/float(dx))
     elif axis == 'y':
         return int((v2-v1)/float(dy))
-
+    
 def inside_check(v1,v2,wcs_obj=None):
     """
     Checks if coordinates (RA,Dec) are inside of coverage
@@ -204,7 +228,7 @@ def inside_check(v1,v2,wcs_obj=None):
         return True
     else:
         return False
-    
+
 def circle(xp,yp,R,astro_obj,relative=False):
     """
     Finds all the grid squares that are in a circle around
@@ -226,11 +250,20 @@ def circle(xp,yp,R,astro_obj,relative=False):
     elif relative == True:
         return np.array([co_x,co_y])-np.array([xg,yg]).reshape(2,1)
     
+"""
+==================================================================
+End of a chunk of old functions.
+There are more later on.
+==================================================================
+"""
+    
+
+    
 def yso_to_grid(yso,astro_obj,yso_return=False):
     """
     Make a new grid to place YSOs into using grid as a mask
     and basis of next grid.
-    yso should by a 2xN array containing x and y values.
+    yso should by a 2xN array containing RA and Dec values.
 
     Optional yso_return function. Returns yso coordinates
     that were inside coverage map.
@@ -268,12 +301,19 @@ def random_ysos(val,astro_obj,mode='binomial',density=None):
     """
     Function to populate a grid with random YSOs. YSOs can be placed anywhere
     with grid == 1.
-    Two modes:
-    If mode is 'binomial' randomly distribute val YSOs around the region.
-    If mode is 'csr', place Poisson((val/study area)*pixel area) ysos in each pixel.
 
-    Both return the coordinates of the ysos and the completed grid.
-    Assumes a uniform probability across the coverage map.
+    val = number of YSOs.
+    density = density map 
+
+    Four modes:
+    'binomial': randomly distribute val YSOs around the region.
+    'csr': place Poisson((val/study area)*pixel area) ysos in each pixel.
+    'nhpp': (non-homogeneous poisson process) randomly distribute val YSOs across map according to density.
+    'nhpp2': same thing as nhpp but insanely slow. Do not use. 
+ 
+    note: binomial and csr assume uniform probability across all cells in the coverage map.
+
+    Returns the coordinates of the ysos and the yso map.
     """
 
     shape = astro_obj.grid.shape
@@ -337,6 +377,30 @@ def random_ysos(val,astro_obj,mode='binomial',density=None):
                         yso_x = np.append(yso_x,x[i])
                         yso_y = np.append(yso_y,y[i])
                         
+    elif mode == 'nhpp':
+        ##Generate pdf
+        prob = density*astro_obj.area_array/np.sum(density*astro_obj.area_array)
+        prob_flat = prob.flatten()
+        cdf = np.cumsum(prob_flat)
+        r_numbers = rnd.rand(val)
+        for rnd_num in r_numbers:
+            rho = prob_flat[np.argmin((cdf-rnd_num)<0)]
+            ii,jj = np.where(prob == rho)
+            
+            #if multiple exist, choose one at random
+            if len(ii) > 1:
+                choose = rnd.randint(0,len(ii))
+                ii,jj = ii[choose],jj[choose]
+
+            yso_map[ii,jj] += 1
+            #generate a random location for the yso within the pixel
+            if astro_obj.inverted:
+                y,x = astro_obj.wcs_obj.all_pix2world(rnd.rand()+jj-0.5,rnd.rand()+ii-0.5,0)
+            else:
+                x,y = astro_obj.wcs_obj.all_pix2world(rnd.rand()+ii-0.5,rnd.rand()+jj-0.5,0)
+            yso_x = np.append(yso_x,x)
+            yso_y = np.append(yso_y,y)
+
     elif mode == 'nhpp2':
         prob = density/float(np.sum(density))
         loop_count = 0
@@ -368,29 +432,7 @@ def random_ysos(val,astro_obj,mode='binomial',density=None):
                         yso_y = np.append(yso_y,y[yso])
                     else:
                         continue
-    elif mode == 'nhpp':
-        ##Generate pdf
-        prob = density*astro_obj.area_array/np.sum(density*astro_obj.area_array)
-        prob_flat = prob.flatten()
-        cdf = np.cumsum(prob_flat)
-        r_numbers = rnd.rand(val)
-        for rnd_num in r_numbers:
-            rho = prob_flat[np.argmin((cdf-rnd_num)<0)]
-            ii,jj = np.where(prob == rho)
-            
-            #if multiple exist, choose one at random
-            if len(ii) > 1:
-                choose = rnd.randint(0,len(ii))
-                ii,jj = ii[choose],jj[choose]
-
-            yso_map[ii,jj] += 1
-            #generate a random location for the yso within the pixel
-            if astro_obj.inverted:
-                y,x = astro_obj.wcs_obj.all_pix2world(rnd.rand()+jj-0.5,rnd.rand()+ii-0.5,0)
-            else:
-                x,y = astro_obj.wcs_obj.all_pix2world(rnd.rand()+ii-0.5,rnd.rand()+jj-0.5,0)
-            yso_x = np.append(yso_x,x)
-            yso_y = np.append(yso_y,y)
+                    
     return np.vstack([yso_x,yso_y]), yso_map
 
 def one_kfunc(x1,y1,t,astro_obj,yso_map):
@@ -418,6 +460,8 @@ def kfunc(x,y,t,astro_obj,yso_map=None,noP=None,diag=False):
     noP determines the number of workers assigned to function for 
     multiprocessing. A value of None or 1 runs the function 
     without multiprocessing.
+
+    diag is optional diagnostic variable to return additional values.
     """
     #if values not specified take global values.
     if yso_map is None:
@@ -480,6 +524,7 @@ def one_oring(x1,y1,t,w,astro_obj,yso_map):
         #Allow o-ring to skip one point within its own grid square.
         if coords[0,j]==xg and coords[1,j]==yg and self_count == False:
             yso_sum-=1
+            self_count = True
 
         area += astro_obj.area_array[coords[0,j],coords[1,j]]
         yso_sum += yso_map[coords[0,j],coords[1,j]]
@@ -546,6 +591,9 @@ def ring(xp,yp,R,w,astro_obj):
     grid coords between xp,yp and circle cells.
     Otherwise provide the absolute references.
     """
+
+    print('deprecated function -- ignore.')
+    
     Rout = R+w/2.0
     Rin = R-w/2.0
     
@@ -693,6 +741,9 @@ def get_area(grid = None):
     Return the effective area of the coverage map
     as float.
     """
+
+    print('deprecated function.')
+
     if grid is None:
         grid = coverage
         
@@ -732,7 +783,9 @@ def get_area_array(tan=True,grid=None,wcs_obj=None,dist=None):
     Else, assumes pixels are small and can be approximated 
     by rectangles rotated with respect to lines of const ra.
     """
-
+    
+    print('deprecated function -- ignore.')
+    
     if grid is None:
         grid = coverage
     if wcs_obj is None:
@@ -770,7 +823,10 @@ def angle2box(xp,yp,t):
     Returns the i and j values of bottom left and top right
     corners.
     """
-        
+
+    print('deprecated function -- ignore.')
+    return None
+
     t = np.sqrt(2)*t
     if inverted:
         j,i = w_obj.all_world2pix(yp,xp,0)
@@ -802,11 +858,6 @@ def angle2box(xp,yp,t):
 
     return int(round(ras[0])),int(round(ras[1])),int(round(decs[0])),int(round(decs[1]))
 
-def collate(results):
-    array = np.empty([4,LOOPS,len(r)])
-    for i in range(LOOPS):
-        array[:,i,:] = np.array(results[i].get())
-    return array
 
 def run_csr(val,r,w,astro_obj,density=None,mode='sphere_binomial',noP=None):
     """
@@ -887,6 +938,10 @@ def get_coords(wcs_obj,grid,centre=True):
     Collect coordinates of pixel centres from a pre-sliced wcs object and 
     equivalently sliced coverage map.
     """
+
+    print('deprecated function -- ignore.')
+    return None
+
     ra_axis,dec_axis = np.shape(grid)
     if centre:
         gx = np.arange(ra_axis)
@@ -912,6 +967,10 @@ def extract_region(bounds,wcs_obj,grid):
     bounds = (2x2) array containing the boundaries of the desired section. [[Ra_0,Ra_1],[Dec_0,Dec_1]]
     grid = array to be sliced using pixel coordinates given by wcs_obj, dimensions must be (RA,Dec).
     """
+
+    print('deprecated function -- ignore.')
+    return None
+
     #coordinates of bottom-left and top-right corners of RA, Dec box.
     bl = (bounds[0,0],bounds[1,0])
     tr = (bounds[0,1],bounds[1,1])
@@ -957,6 +1016,10 @@ def extract_region(bounds,wcs_obj,grid):
 #time length of project and estimate completion time
 A = []
 def callbackTimer(x):
+    """
+    This doesn't work for times but it gives an estimate of completion percentage which is nice.
+    """
+    
     toc = time.time() - tic
     A.append(toc)
     completed = len(A)/float(LOOPS)*100
@@ -972,6 +1035,10 @@ def reduce_map(grid,yso_map,L,p0,tol=1,yso_return=False):
     Optional yso_return argument for when ysos have been excluded due to 
     coverage map being reduced.
     """
+
+    print('deprecated function -- ignore.')
+    return None
+    
     def get_k(lmda,w,p0):
         """
         Find kmin assuming Poisson distribution of yso counts in areas.
@@ -1048,9 +1115,11 @@ def clean_map(grid,L,p0):
     contain too few YSOs.
     The minimum number of ysos is specified by p0 using the method by 
     Wiegand et al 2004.
-    Optional yso_return argument for when ysos have been excluded due to 
-    coverage map being reduced.
     """
+
+    print('deprecated function -- ignore.')
+    return None
+
     def get_k(lmda,w,p0,k0=0):
         """
         Find kmin assuming Poisson distribution of yso counts in areas.
@@ -1118,6 +1187,9 @@ def foi_map(grid,yso_map,L):
     The minimum number of ysos is specified by p0 using the method by 
     Wiegand et al 2004.
     """
+    
+    print('deprecated function -- ignore.')
+    return None
 
     shape = np.shape(grid)
     lmda_map = np.zeros(shape)
