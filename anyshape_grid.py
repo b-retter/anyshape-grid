@@ -16,247 +16,6 @@ import copy
 from timeit import default_timer as timer
 
 
-"""
-==================================================================
-Old functions -- probably not going to be used any more.
-They could probably be deleted.
-==================================================================
-"""
-def num_to_step(num):
-    """
-    converts number 1 to 4 into a step in either x or y direction
-           2
-        1     3
-           4
-    """
-
-    print('deprecated function -- ignore.')
-    return None
-    
-    if num == 1:
-        return np.array([-1,0])
-    elif num == 2:
-        return np.array([0,1])
-    elif num == 3:
-        return np.array([1,0])
-    elif num == 4:
-        return np.array([0,-1])
-
-def is_wall(current,step,grid):
-    """checks if grid + step exceeds grid.
-    If so, return True
-    current = array([x,y])
-    step = array([x,y])
-    """
-    
-    print('deprecated function -- ignore.')
-    return None
-    
-    dim = np.shape(grid)
-    stepped = current+step
-    if np.any(stepped < 0) or stepped[0] > dim[0]-1 or stepped[1] > dim[1]-1:
-        return True
-    else:
-        return False
-    
-def box_check(xg,yg,Lx,Ly=None,grid=None):
-    """
-    Checks if there are any cells not covered by coverage map, or
-    exceed the bounds of the coverage map within box of side L,
-    centered on xg,yg.
-    Returns False if not entirely within map.
-    """
-
-    print('deprecated function -- ignore.')
-    return None
-    
-    if grid is None:
-        grid = coverage
-    if Ly is None:
-        Ly = Lx
-        
-    #Check if bounds nearby
-    steps = map(num_to_step,range(1,5))
-    xy = np.array([xg,yg])
-    if is_wall(xy,steps[0]*(Lx/2),grid) or is_wall(xy,steps[2]*(Lx/2),grid):
-        return False
-    if is_wall(xy,steps[1]*(Ly/2),grid) or is_wall(xy,steps[3]*(Ly/2),grid):
-        return False
-
-    #Check if any cells not in coverage map
-    x_min,x_max = xg-Lx/2, xg+Lx/2+1
-    y_min,y_max = yg-Ly/2, yg+Ly/2+1
-    if np.any(grid[x_min:x_max,y_min:y_max] == 0):
-        return False
-    else:
-        return True
-
-def circle_check(xp,yp,R,grid=None):
-    """
-    Checks if there are any cells not covered by coverage map, or
-    exceed the bounds of the coverage map within circle of radius R,
-    centered on xp,yp.
-    Returns False if not entirely within map.
-    """
-
-    print('deprecated function -- ignore.')
-    return None
-
-    
-    if grid is None:
-        grid = coverage
-
-    xg,yg = xy2grid(xp,yp)
-    Rx = delDist2Grid(R,axis='x')
-    Ry = delDist2Grid(R,axis='y')
-
-    #Check if bounds nearby
-    steps = map(num_to_step,range(1,5))
-    xy = np.array([xg,yg])
-    if is_wall(xy,steps[0]*(Rx),grid) or is_wall(xy,steps[2]*(Rx),grid):
-        return False
-    if is_wall(xy,steps[1]*(Ry),grid) or is_wall(xy,steps[3]*(Ry),grid):
-        return False
-    
-
-    GX, GY = np.meshgrid(gx,gy,indexing='ij')
-    dists = np.sqrt((GX-xp)**2 + (GY-yp)**2)
-    co_x,co_y = np.where((dists <= R) & (grid == 0))
-    if len(co_x) == 0:
-        return True
-    else:
-        return False
-
-def make_grid(n_areas,n_length,n_height):
-    """
-    generates an arbitrary shaped region through random walking starting in the centre
-    """
-
-    print('deprecated function -- ignore.')
-    return None
-    
-    def b_condition(loc,step):
-        if is_wall(loc,step,grid):
-            # if it is a wall, add the length or height of the grid
-            # making a torus
-            return loc+step-np.array([n_length,n_height])*step
-        else:
-            return loc+step
-        
-    def random_walk(loc):
-        """
-        random walker direction
-           2
-        1     3
-           4
-        """
-        step = num_to_step(rnd.randint(1,5))
-        return b_condition(loc,step)
-
-    def check_stay(w):
-        """
-        check if walker walks or stays
-        walker stays if current square is 0 and one neighbouring square is 1
-        otherwise return false. 
-        """
-        if np.sum([grid[b_condition(w,num_to_step(num))[0],b_condition(w,num_to_step(num))[1]] \
-                   for num in range(1,5)]) > 0 and grid[w[0],w[1]] == 0:
-            return True
-        else:
-            return False
-        
-    grid = np.zeros((n_length,n_height))
-    mid = np.array([(n_length-1)/2, (n_height-1)/2])
-    grid[mid[0],mid[1]] = 1
-
-    while np.sum(grid) < n_areas:
-        walker = np.array([mid[0],mid[1]])
-        while check_stay(walker) == False:
-            walker = random_walk(walker)
-        grid[walker[0],walker[1]] = 1
-
-    return grid
-
-def xy2grid(v1,v2,wcs_obj=None):
-    """
-    convert world coordinates (v1,v2) to grid coordinates
-    (i,j).
-    """
-    if wcs_obj is None:
-        wcs_obj = w_obj
-
-    if invertcheck(wcs_obj):
-        j,i = wcs_obj.all_world2pix(v2,v1,0)
-    else:
-        i,j = wcs_obj.all_world2pix(v1,v2,0)
-        
-    return int(np.round(i)),int(np.round(j))
-
-def ij2xy(i,j,wcs_obj=None):
-    """
-    convert grid coordinates (i,j) to world coordinates.
-    """
-    if wcs_obj is None:
-        wcs_obj = w_obj
-
-    if invertcheck(wcs_obj):
-        y,x = wcs_obj.all_pix2world(j,i,0)
-    else:
-        x,y = wcs_obj.all_pix2world(i,j,0)
-    return x,y
-
-def delDist2Grid(v2,v1=0,axis=None):
-    if axis == 'x':
-        return int((v2-v1)/float(dx))
-    elif axis == 'y':
-        return int((v2-v1)/float(dy))
-    
-def inside_check(v1,v2,wcs_obj=None):
-    """
-    Checks if coordinates (RA,Dec) are inside of coverage
-    map given by wcs_obj.
-    Returns False if not inside coverage map.
-    """
-        
-    if wcs_obj is None:
-        wcs_obj = w_obj
-    if invertcheck(wcs_obj):
-        cdec,cra = wcs_obj.all_world2pix(v2,v1,0)
-    else:
-        cra,cdec = wcs_obj.all_world2pix(v1,v2,0)
-    if  0 <= round(cra) < ra_axis and 0 <= round(cdec) < dec_axis:
-        return True
-    else:
-        return False
-
-def circle(xp,yp,R,astro_obj,relative=False):
-    """
-    Finds all the grid squares that are in a circle around
-    xp,yp with radius R.
-    If relative is true, provide relative differences in
-    grid coords between xp,yp and circle cells.
-    Otherwise provide the absolute references.
-    """
-    
-    if not inside_check(xp,yp):
-        print('world coordinate outside coverage map')
-        
-    #reduce distance search to more immediate values
-    il,ir,jl,jr = angle2box(xp,yp,R)
-    dists = gcircle((gx[il:ir,jl:jr],gy[il:ir,jl:jr]),(xp,yp))
-    co_x,co_y = np.where((dists <= R) & (grid[il:ir,jl:jr] == 1))
-    if relative == False:
-        return np.array([co_x+il,co_y+jl])
-    elif relative == True:
-        return np.array([co_x,co_y])-np.array([xg,yg]).reshape(2,1)
-    
-"""
-==================================================================
-End of a chunk of old functions.
-There are more later on.
-==================================================================
-"""
-
 def scaledMAD(envelope,T0,results = None):
     """ Returns maximum directional quantile scaled MAD measure for each spatial stat for each iteration of a
     spatial process.
@@ -1795,3 +1554,246 @@ class astro_box(object):
         dists = gcircle((self.RA[il:ir,jl:jr],self.Dec[il:ir,jl:jr]),(xp,yp))
         co_x,co_y = np.where((dists <= R) & (self.grid[il:ir,jl:jr] == 1))
         return np.array([co_x+il,co_y+jl])
+
+    
+
+"""
+==================================================================
+Old functions -- probably not going to be used any more.
+They could probably be deleted.
+==================================================================
+"""
+def num_to_step(num):
+    """
+    converts number 1 to 4 into a step in either x or y direction
+           2
+        1     3
+           4
+    """
+
+    print('deprecated function -- ignore.')
+    return None
+    
+    if num == 1:
+        return np.array([-1,0])
+    elif num == 2:
+        return np.array([0,1])
+    elif num == 3:
+        return np.array([1,0])
+    elif num == 4:
+        return np.array([0,-1])
+
+def is_wall(current,step,grid):
+    """checks if grid + step exceeds grid.
+    If so, return True
+    current = array([x,y])
+    step = array([x,y])
+    """
+    
+    print('deprecated function -- ignore.')
+    return None
+    
+    dim = np.shape(grid)
+    stepped = current+step
+    if np.any(stepped < 0) or stepped[0] > dim[0]-1 or stepped[1] > dim[1]-1:
+        return True
+    else:
+        return False
+    
+def box_check(xg,yg,Lx,Ly=None,grid=None):
+    """
+    Checks if there are any cells not covered by coverage map, or
+    exceed the bounds of the coverage map within box of side L,
+    centered on xg,yg.
+    Returns False if not entirely within map.
+    """
+
+    print('deprecated function -- ignore.')
+    return None
+    
+    if grid is None:
+        grid = coverage
+    if Ly is None:
+        Ly = Lx
+        
+    #Check if bounds nearby
+    steps = map(num_to_step,range(1,5))
+    xy = np.array([xg,yg])
+    if is_wall(xy,steps[0]*(Lx/2),grid) or is_wall(xy,steps[2]*(Lx/2),grid):
+        return False
+    if is_wall(xy,steps[1]*(Ly/2),grid) or is_wall(xy,steps[3]*(Ly/2),grid):
+        return False
+
+    #Check if any cells not in coverage map
+    x_min,x_max = xg-Lx/2, xg+Lx/2+1
+    y_min,y_max = yg-Ly/2, yg+Ly/2+1
+    if np.any(grid[x_min:x_max,y_min:y_max] == 0):
+        return False
+    else:
+        return True
+
+def circle_check(xp,yp,R,grid=None):
+    """
+    Checks if there are any cells not covered by coverage map, or
+    exceed the bounds of the coverage map within circle of radius R,
+    centered on xp,yp.
+    Returns False if not entirely within map.
+    """
+
+    print('deprecated function -- ignore.')
+    return None
+
+    
+    if grid is None:
+        grid = coverage
+
+    xg,yg = xy2grid(xp,yp)
+    Rx = delDist2Grid(R,axis='x')
+    Ry = delDist2Grid(R,axis='y')
+
+    #Check if bounds nearby
+    steps = map(num_to_step,range(1,5))
+    xy = np.array([xg,yg])
+    if is_wall(xy,steps[0]*(Rx),grid) or is_wall(xy,steps[2]*(Rx),grid):
+        return False
+    if is_wall(xy,steps[1]*(Ry),grid) or is_wall(xy,steps[3]*(Ry),grid):
+        return False
+    
+
+    GX, GY = np.meshgrid(gx,gy,indexing='ij')
+    dists = np.sqrt((GX-xp)**2 + (GY-yp)**2)
+    co_x,co_y = np.where((dists <= R) & (grid == 0))
+    if len(co_x) == 0:
+        return True
+    else:
+        return False
+
+def make_grid(n_areas,n_length,n_height):
+    """
+    generates an arbitrary shaped region through random walking starting in the centre
+    """
+
+    print('deprecated function -- ignore.')
+    return None
+    
+    def b_condition(loc,step):
+        if is_wall(loc,step,grid):
+            # if it is a wall, add the length or height of the grid
+            # making a torus
+            return loc+step-np.array([n_length,n_height])*step
+        else:
+            return loc+step
+        
+    def random_walk(loc):
+        """
+        random walker direction
+           2
+        1     3
+           4
+        """
+        step = num_to_step(rnd.randint(1,5))
+        return b_condition(loc,step)
+
+    def check_stay(w):
+        """
+        check if walker walks or stays
+        walker stays if current square is 0 and one neighbouring square is 1
+        otherwise return false. 
+        """
+        if np.sum([grid[b_condition(w,num_to_step(num))[0],b_condition(w,num_to_step(num))[1]] \
+                   for num in range(1,5)]) > 0 and grid[w[0],w[1]] == 0:
+            return True
+        else:
+            return False
+        
+    grid = np.zeros((n_length,n_height))
+    mid = np.array([(n_length-1)/2, (n_height-1)/2])
+    grid[mid[0],mid[1]] = 1
+
+    while np.sum(grid) < n_areas:
+        walker = np.array([mid[0],mid[1]])
+        while check_stay(walker) == False:
+            walker = random_walk(walker)
+        grid[walker[0],walker[1]] = 1
+
+    return grid
+
+def xy2grid(v1,v2,wcs_obj=None):
+    """
+    convert world coordinates (v1,v2) to grid coordinates
+    (i,j).
+    """
+    if wcs_obj is None:
+        wcs_obj = w_obj
+
+    if invertcheck(wcs_obj):
+        j,i = wcs_obj.all_world2pix(v2,v1,0)
+    else:
+        i,j = wcs_obj.all_world2pix(v1,v2,0)
+        
+    return int(np.round(i)),int(np.round(j))
+
+def ij2xy(i,j,wcs_obj=None):
+    """
+    convert grid coordinates (i,j) to world coordinates.
+    """
+    if wcs_obj is None:
+        wcs_obj = w_obj
+
+    if invertcheck(wcs_obj):
+        y,x = wcs_obj.all_pix2world(j,i,0)
+    else:
+        x,y = wcs_obj.all_pix2world(i,j,0)
+    return x,y
+
+def delDist2Grid(v2,v1=0,axis=None):
+    if axis == 'x':
+        return int((v2-v1)/float(dx))
+    elif axis == 'y':
+        return int((v2-v1)/float(dy))
+    
+def inside_check(v1,v2,wcs_obj=None):
+    """
+    Checks if coordinates (RA,Dec) are inside of coverage
+    map given by wcs_obj.
+    Returns False if not inside coverage map.
+    """
+        
+    if wcs_obj is None:
+        wcs_obj = w_obj
+    if invertcheck(wcs_obj):
+        cdec,cra = wcs_obj.all_world2pix(v2,v1,0)
+    else:
+        cra,cdec = wcs_obj.all_world2pix(v1,v2,0)
+    if  0 <= round(cra) < ra_axis and 0 <= round(cdec) < dec_axis:
+        return True
+    else:
+        return False
+
+def circle(xp,yp,R,astro_obj,relative=False):
+    """
+    Finds all the grid squares that are in a circle around
+    xp,yp with radius R.
+    If relative is true, provide relative differences in
+    grid coords between xp,yp and circle cells.
+    Otherwise provide the absolute references.
+    """
+    
+    if not inside_check(xp,yp):
+        print('world coordinate outside coverage map')
+        
+    #reduce distance search to more immediate values
+    il,ir,jl,jr = angle2box(xp,yp,R)
+    dists = gcircle((gx[il:ir,jl:jr],gy[il:ir,jl:jr]),(xp,yp))
+    co_x,co_y = np.where((dists <= R) & (grid[il:ir,jl:jr] == 1))
+    if relative == False:
+        return np.array([co_x+il,co_y+jl])
+    elif relative == True:
+        return np.array([co_x,co_y])-np.array([xg,yg]).reshape(2,1)
+    
+"""
+==================================================================
+End of a chunk of old functions.
+There are more later on.
+==================================================================
+"""
