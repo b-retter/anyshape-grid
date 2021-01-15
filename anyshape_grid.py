@@ -256,6 +256,137 @@ End of a chunk of old functions.
 There are more later on.
 ==================================================================
 """
+
+def scaledMAD(envelope,T0,results = None):
+    """ Returns maximum directional quantile scaled MAD measure for each spatial stat for each iteration of a
+    spatial process.
+
+    Can potentially take 3 arguments. Envelope should be the result of runs under the null hypothesis.
+    Results are the values you would like to calc MAD for.
+    T0 are the expected values under the null hypothesis. Should be one for each stat covered by envelopes 
+    Without a results argument MAD is calc'd for the H0 runs and returns values usable to find the desired confidence envelope.
+    
+    Expects 3 dimensional matrix with dimensions [STATS, LOOPS, R] with the same size array for both envelope and results. 
+    """
+    
+    #if only one stat, then ensure shape is 1,LOOPS,len_r
+    
+    shape = np.shape(envelope)
+    if len(shape) == 3 and shape[0] > 1:
+        loops = np.shape(envelope)[1]
+        len_r = np.shape(envelope)[2]
+        stats = shape[0]
+    else:
+        loops = np.shape(envelope)[0]
+        len_r = np.shape(envelope)[1]
+        envelope = envelope[np.newaxis,:,:]
+        stats=1
+        
+    if results is None:
+        results = envelope
+        
+    #Generate matrix of expectations of spatial stats under CSR. Dimensions are 4,LOOPS,len_r to compare all results at once with < and >.
+    T0 = np.atleast_1d(T0)
+    
+    if len(T0.shape) == 1 and stats == 1:
+        #If T0 is 1d and only one stat
+        T0 = T0.reshape(stats,1,len(T0))
+        T0 = np.repeat(T0,loops,axis=1)
+        
+        if len(T0) == 1:
+            T0 = np.repeat(T0,len_r,axis=2)
+            
+    elif len(T0.shape) == 1 and stats > 1:
+        #If T0 is 1d and more than one stat
+        T0 = T0.reshape(stats,1) 
+        T0 = np.repeat(T0,loops,axis=1)
+        T0 = np.expand_dims(T0,2)
+        T0 = np.repeat(T0,len_r,axis=2)
+    else:
+        #If T0 is greater than 1d
+        T0 = T0[:,np.newaxis,:]
+        T0 = np.repeat(T0,loops,axis=1)
+
+
+    Tlow = np.expand_dims(np.percentile(envelope,2.5,axis=1),1)
+    Tup = np.expand_dims(np.percentile(envelope,97.5,axis=1),1)
+
+    #Directional quantile integration scaled MAD measure. Equation 22 from Myllmaki et al. 2017
+    u = np.abs((results >= T0)*((results - T0)/np.abs(Tup-T0)) + (results < T0)*((results - T0)/np.abs(Tlow-T0)))
+    return np.nanmax(u,axis=2)
+
+def envMaker(results,envelope,T0,alpha):
+    """ Takes in directional quantile scaled MAD measures and returns alpha% confidence envelope from results.
+    alpha*(s+1), where s is the number of simulations, must be an integer.
+    results = observed statistics from pattern. Dimensions [stats, R]
+    envelope = simulated results of null hypothesis. Dimensions [stats,loops,R] or [loops,R]
+    """
+
+    #(copied from scaledMAD)
+    shape = np.shape(envelope)
+    if len(shape) == 3 and shape[0] > 1:
+        loops = shape[1]+1
+        len_r = shape[2]
+        stats = shape[0]
+    else:
+        loops = shape[0]+1
+        len_r = shape[1]
+        envelope = envelope[np.newaxis,:,:]
+        stats=1
+
+    ##Make sure results is in the correct format
+    r_shape = np.shape(results)
+    if len(r_shape) < 3:
+        results = results[:,np.newaxis,:]
+
+    crit = float(alpha*(loops))
+    if crit != int(crit):
+        print(r'alpha $\times$ (s+1) must be an integer, where is the number of simulations of null hypothesis.')
+        exit()
+    else:
+        crit = int(crit)
+
+    #set-up with parameters from scaledMAD
+    u = scaledMAD(np.append(envelope,results,axis=1),T0)
+    
+    #Generate matrix of expectations of spatial stats under CSR. Dimensions are 4,LOOPS,len_r to compare all results at once with < and >.
+    T0 = np.atleast_1d(T0)
+    
+    if len(T0.shape) == 1 and stats == 1:
+        #If T0 is 1d and only one stat
+        T0 = T0.reshape(stats,1,len(T0))
+        T0 = np.repeat(T0,loops,axis=1)
+        
+        if len(T0) == 1:
+            T0 = np.repeat(T0,len_r,axis=2)
+            
+    elif len(T0.shape) == 1 and stats > 1:
+        #If T0 is 1d and more than one stat
+        T0 = T0.reshape(stats,1) 
+        T0 = np.repeat(T0,loops,axis=1)
+        T0 = np.expand_dims(T0,2)
+        T0 = np.repeat(T0,len_r,axis=2)
+    else:
+        #If T0 is greater than 1d
+        T0 = T0[:,np.newaxis,:]
+        T0 = np.repeat(T0,loops,axis=1)
+
+    Tlow = np.expand_dims(np.percentile(envelope,2.5,axis=1),1)
+    Tup = np.expand_dims(np.percentile(envelope,97.5,axis=1),1)
+
+    #Removes degeneracy of LOOP axis from T0, Tlow and Tup as all share the same value. Axes are [STAT and R]
+
+    T0 = T0[:,0,:]
+    Tlow = Tlow[:,0,:]
+    Tup = Tup[:,0,:]
+        
+    #finds critical MAD value from alpha*(s+1) (which must be an integer), where alpha is the desired confidence
+    #level and s is the number of realisations of the null model.
+    z = u.argsort(axis=1)[:,np.shape(u)[1]-crit]
+
+    #return the (100-alpha)% global confidence envelope
+    u_alpha = u[np.arange(stats),z][:,np.newaxis]
+    return T0 - u_alpha*np.abs(Tlow - T0), T0 + u_alpha*np.abs(Tup - T0)
     
 
     
